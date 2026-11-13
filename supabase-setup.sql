@@ -10,6 +10,11 @@ create table if not exists public.docs (
 );
 create index if not exists docs_col_idx on public.docs (col);
 
+-- Права: только вошедшие пользователи, без входа — ничего
+grant usage on schema public to authenticated;
+grant select, insert, update, delete on public.docs to authenticated;
+revoke all on public.docs from anon;
+
 -- Защита: без входа данные не видны и не меняются
 alter table public.docs enable row level security;
 
@@ -31,5 +36,5 @@ create trigger docs_touch before insert or update on public.docs for each row ex
 -- Обновления в реальном времени (изменения видны всем сразу)
 alter table public.docs replica identity full;
 do $$ begin
-  begin alter publication supabase_realtime add table public.docs; exception when duplicate_object then null; end;
+  begin alter publication supabase_realtime add table public.docs; exception when others then null; end;
 end $$;
