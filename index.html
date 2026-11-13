@@ -329,9 +329,11 @@ function empRate(emp,city,role){
   if(v===undefined||v===null||v==='') return role==='sales'?10:0;
   return num(v);
 }
-function ruleExtras(rules,city,techId){
+function ruleNorm(r){return {role:r.role||'tech',cities:r.cities&&r.cities.length?r.cities:(r.city?[r.city]:[]),whoId:r.whoId||r.techId||''}}
+function ruleExtras(rules,city,techId,teacherId){
   const out=[];
-  (rules||[]).forEach(r=>{ if(r && r.enabled!==false && !r.deleted && r.city===city && techId && r.techId===techId)
+  (rules||[]).forEach(r=>{ if(!r||r.enabled===false||r.deleted)return;const n=ruleNorm(r);const who=n.role==='teacher'?teacherId:techId;
+    if(n.cities.includes(city) && who && n.whoId===who)
     (r.targets||[]).forEach(t=>{ if(t.empId && num(t.pct)) out.push({empId:t.empId,pct:num(t.pct),ruleId:r.id}) }) });
   return out;
 }
@@ -719,7 +721,9 @@ function rolesIn(e,city){
   if(!(e.cities||[]).includes(city))return [];
   const r=(e.roles||[]).filter(x=>x!=='owner');if(!r.includes('sales')&&!e.noSales)r.push('sales');return r;
 }
-function hasRole(e,city,role){return rolesIn(e,city).includes(role)}
+function isRemote(e){if(typeof e==='string')e=emp(e);return !!(e&&e.remote&&(e.roles||[]).includes('teacher'))}
+function hasRole(e,city,role){if(role==='teacher'&&isRemote(e))return true;return rolesIn(e,city).includes(role)}
+function cityLabel(c){return c==='all'?'Все города':(CITY_NAME[c]||'')}
 function isOwnerRole(e){return (e.roles||[]).includes('owner')}
 function teacherList(city,cur){return liveEmps().filter(e=>(e.active!==false&&hasRole(e,city,'teacher'))||e.id===cur)}
 function techList(city,cur){return liveEmps().filter(e=>(e.active!==false&&hasRole(e,city,'tech'))||e.id===cur)}
@@ -735,7 +739,7 @@ function busyOf(pid,date,excl){
     (x.type==='session'&&sessLive(x)&&x.clientId!==excl)||(x.type==='slot'&&slotOwner(x)&&slotOwner(x)!==excl)||(x.type!=='slot'&&x.type!=='session')))
     .map(x=>[toMin(x.start),toMin(x.start)+num(x.dur||60)]);
 }
-function windowsOf(pid,city,date){return liveSched().filter(x=>x.type==='slot'&&x.playerId===pid&&x.city===city&&x.date===date&&!slotOwner(x))}
+function windowsOf(pid,city,date){const rem=isRemote(pid);return liveSched().filter(x=>x.type==='slot'&&x.playerId===pid&&(rem||x.city===city||x.city==='all')&&x.date===date&&!slotOwner(x))}
 function freeAt(pid,city,date,a,b,excl){
   return windowsOf(pid,city,date).some(w=>toMin(w.start)<=a&&toMin(w.start)+num(w.dur)>=b)&&!busyOf(pid,date,excl).some(([x,y])=>x<b&&y>a);
 }
@@ -744,7 +748,7 @@ function pairOptions(city,excl,from,to){
   const techs=liveEmps().filter(e=>e.active!==false&&hasRole(e,city,'tech'));
   const teachers=liveEmps().filter(e=>e.active!==false&&hasRole(e,city,'teacher'));
   const out=[];const seen=new Set();
-  liveSched().filter(w=>w.type==='slot'&&w.city===city&&w.date>=from&&w.date<=to&&!slotOwner(w)&&techs.some(t=>t.id===w.playerId)).forEach(w=>{
+  liveSched().filter(w=>w.type==='slot'&&(w.city===city||w.city==='all'||isRemote(w.playerId))&&w.date>=from&&w.date<=to&&!slotOwner(w)&&techs.some(t=>t.id===w.playerId)).forEach(w=>{
     const ws=toMin(w.start),we=ws+num(w.dur);
     for(let t=ws;t+L<=we;t+=60){
       if(w.date===td&&t<=nm)continue;
@@ -910,7 +914,8 @@ function drawCalc(){
 function applyRates(which){
   const c=F;const rules=cfg().rules;
   if(which.includes('teacher'))c.rates.teacher=empRate(emp(c.teacherId),c.city,'teacher');
-  if(which.includes('tech')){c.rates.tech=empRate(emp(c.techId),c.city,'tech');c.rates.extras=ruleExtras(rules,c.city,c.techId)}
+  if(which.includes('tech'))c.rates.tech=empRate(emp(c.techId),c.city,'tech');
+  if(which.includes('teacher')||which.includes('tech'))c.rates.extras=ruleExtras(rules,c.city,c.techId,c.teacherId);
   if(which.includes('sales'))c.rates.sales=c.soldBy&&c.soldBy!=='self'?empRate(emp(c.soldBy),c.city,'sales'):0;
 }
 function bindClientForm(box){
@@ -1034,7 +1039,7 @@ function viewStaff(){
   return tb+`<div class="cards">${list.map(e=>`<div class="card emp">
     <div class="row"><div class="nm grow">${esc(e.name)}</div>${e.active===false?'<span class="chip">Неактивен</span>':'<span class="chip acc">Активен</span>'}</div>
     <div class="small muted" style="margin-top:2px">${e.email?'Логин: '+esc(emailToLogin(e.email))+(e.userId?' · входил':' · ещё не входил'):(e.userId?'вход настроен':'<span style="color:var(--warn)">логин не указан</span>')}</div>
-    <div class="row" style="margin:10px 0 6px;gap:6px">${(e.roles||[]).includes('owner')?'<span class="chip acc">Владелец</span>':''}</div>
+    <div class="row" style="margin:10px 0 6px;gap:6px">${(e.roles||[]).includes('owner')?'<span class="chip acc">Владелец</span>':''}${isRemote(e)?'<span class="chip acc">Учитель удалённо · все города</span>':''}</div>
     <div class="small muted" style="line-height:1.7">${rolesSummary(e)}</div>
     <div class="row" style="margin-top:14px"><div class="grow"><div class="tiny muted">Заработано за всё время</div><div class="num" style="font-size:20px">${money(tot[e.id]||0)}</div></div></div>
     <div class="row" style="margin-top:12px"><button class="btn sm" data-emp-card="${e.id}">Карточка и выплаты</button><button class="btn sm" data-emp-edit="${e.id}">Изменить</button><button class="btn sm danger" data-emp-del="${e.id}">Удалить</button></div>
@@ -1080,6 +1085,8 @@ function drawEmpForm(){
      </div>`}).join('')}</div>
      ${E._origRates?'<div class="note">Изменение ролей и ставок не пересчитывает уже сохранённых клиентов: у них проценты зафиксированы в момент сохранения.</div>':''}</div>`
      :'<div class="info">Выберите города — для каждого города роли и проценты задаются отдельно. Например: тех специалист в Алматы, а продажник только в Астане.</div>'}
+   <div class="field"><label class="check"><input type="checkbox" id="e-remote" ${E.remote?'checked':''}> Учитель удалённо — работает во всех городах</label>
+     <div class="tiny muted" style="margin:4px 0 0 28px">Свободное время вносится один раз, без города, и подходит для клиентов любого города. Процент учителя можно задать свой для каждого города.</div></div>
    <div class="field"><label class="check"><input type="checkbox" id="e-owner" ${E.owner?'checked':''}> Владелец <span class="muted small">(видит всё: аналитику, игроков, выплаты, настройки)</span></label></div>
    <div class="field"><label class="check"><input type="checkbox" id="e-noSales" ${E.noSales?'checked':''}> Без процента за продажу <span class="muted small">(для владельца и партнёров)</span></label></div>
    <div class="field"><label class="lbl">Статус</label>${seg('active',[{id:'1',name:'Активен'},{id:'0',name:'Неактивен'}],E.active===false?'0':'1')}</div>
@@ -1097,6 +1104,7 @@ function drawEmpForm(){
     drawEmpForm()};
   $$('[data-croles]',box).forEach(g=>g.onclick=e=>{const b=e.target.closest('button');if(!b)return;const c=g.dataset.croles,v=b.dataset.v;const rs=E.rolesByCity[c]||[];
     E.rolesByCity[c]=rs.includes(v)?rs.filter(x=>x!==v):[...rs,v];drawEmpForm()});
+  $('#e-remote',box).onchange=e=>{E.remote=e.target.checked;if(E.remote){CITIES.forEach(c=>{if(!E.cities.includes(c.id))E.cities.push(c.id);const rs=E.rolesByCity[c.id]||[];if(!rs.includes('teacher'))E.rolesByCity[c.id]=[...rs,'teacher']})}drawEmpForm()};
   $('#e-owner',box).onchange=e=>{E.owner=e.target.checked;if(E.owner)E.noSales=true;drawEmpForm()};
   $('#e-noSales',box).onchange=e=>{E.noSales=e.target.checked;drawEmpForm()};
   $$('[data-rate]',box).forEach(i=>i.oninput=()=>{const [c,r]=i.dataset.rate.split('.');E.rates[c][r]=num(i.value);E._touched=true});
@@ -1120,7 +1128,7 @@ async function saveEmp(){
   E.cities.forEach(c=>{const rs=CITY_ROLES.map(r=>r.id).filter(r=>(E.rolesByCity[c]||[]).includes(r));rolesByCity[c]=rs;const r=E.rates[c]||{};
     rates[c]={teacher:rs.includes('teacher')?num(r.teacher):0,tech:rs.includes('tech')?num(r.tech):0,sales:rs.includes('sales')&&!E.noSales?num(r.sales):0}});
   const roles=[...new Set(Object.values(rolesByCity).flat())];if(E.owner)roles.push('owner');
-  const data={name:E.name.trim(),cities:E.cities,rolesByCity,roles,rates,noSales:!!E.noSales,active:E.active!==false,userId:E.userId||'',email,deleted:false,
+  const data={name:E.name.trim(),cities:E.cities,rolesByCity,roles,rates,remote:!!E.remote&&roles.includes('teacher'),noSales:!!E.noSales,active:E.active!==false,userId:E.userId||'',email,deleted:false,
     createdAt:old?old.createdAt:nowIso(),updatedAt:nowIso()};
   closeModal();
   try{await setDoc(BASE+'/employees/'+id,data);toast(old?'Игрок сохранён':'Игрок добавлен')}catch(e){}
@@ -1398,8 +1406,8 @@ function viewSettings(){
     <p class="small muted">Определяет, в какой 10-дневный период и месяц попадает клиент — в выплатах и в аналитике.</p></div>
 
   <div class="card" style="margin-top:16px"><div class="row"><div class="sectiontitle grow" style="margin:0">Правила-доплаты</div><button class="btn pri" data-act="newRule">+ Правило</button></div>
-    <p class="small muted">«Если тех специалист = X, то дополнительно Y получает N% и Z получает N% от выручки клиента». Подставляется в анкету при выборе тех специалиста и фиксируется при сохранении.</p>
-    <div class="list">${c.rules.filter(r=>!r.deleted).map(r=>`<div class="item"><span class="grow">${esc(CITY_NAME[r.city])}: если тех специалист = <b>${esc(empName(r.techId))}</b>, то ${(r.targets||[]).map(t=>'<b>'+esc(empName(t.empId))+'</b> +'+t.pct+'%').join(' и ')}</span>
+    <p class="small muted">«Если учитель (или тех специалист) = X в выбранных городах, то дополнительно Y получает N% от выручки клиента». Подставляется в анкету при выборе игрока и фиксируется при сохранении.</p>
+    <div class="list">${c.rules.filter(r=>!r.deleted).map(r=>`<div class="item"><span class="grow">${ruleText(r)}</span>
       <label class="check small"><input type="checkbox" data-rule-on="${r.id}" ${r.enabled!==false?'checked':''}> вкл</label><button class="btn sm" data-rule-edit="${r.id}">Изменить</button><button class="btn sm danger" data-rule-del="${r.id}">Удалить</button></div>`).join('')||'<div class="muted small">Правил пока нет</div>'}</div></div>
 
   <div class="card" style="margin-top:16px"><div class="row"><div class="sectiontitle grow" style="margin:0">Статусы</div><button class="btn" data-act="addStatus">+ Статус</button></div>
@@ -1422,30 +1430,41 @@ function viewSettings(){
     <div class="small">${log.slice(0,100).map(h=>`<div style="padding:6px 0;border-top:1px solid var(--line)">${dshow(h.at)} ${String(h.at).slice(11,16)} · <b>${esc(accName(h.by))}</b> · ${esc(h.name)} — ${esc(h.action)}</div>`).join('')||'<div class="muted">Пока пусто</div>'}</div>
     <p class="tiny muted">Время — UTC. Показаны последние 100 записей.</p></div>`;
 }
+function ruleText(r){const n=ruleNorm(r);return `${esc(n.cities.map(c=>CITY_NAME[c]).join(', '))}: если ${n.role==='teacher'?'учитель':'тех специалист'} = <b>${esc(empName(n.whoId))}</b>, то ${(r.targets||[]).map(t=>'<b>'+esc(empName(t.empId))+'</b> +'+t.pct+'%').join(' и ')}`}
 function openRule(id){
   const c=cfg();const src=id?c.rules.find(r=>r.id===id):null;
-  const R=src?JSON.parse(JSON.stringify(src)):{id:'r'+Date.now().toString(36),city:'astana',techId:'',targets:[{empId:'',pct:''},{empId:'',pct:''}],enabled:true};
-  while(R.targets.length<2)R.targets.push({empId:'',pct:''});
-  const m=openModal('<div id="rf"></div>',{cls:'narrow'});
-  const draw=()=>{const box=$('#rf');const techs=techList(R.city,R.techId);const all=liveEmps().filter(e=>e.active!==false||R.targets.some(t=>t.empId===e.id));
+  const n=src?ruleNorm(src):{role:'teacher',cities:[],whoId:''};
+  const R={id:src?src.id:'r'+Date.now().toString(36),role:n.role,cities:n.cities.slice(),whoId:n.whoId,targets:src?JSON.parse(JSON.stringify(src.targets||[])):[{empId:'',pct:''}],enabled:src?src.enabled!==false:true};
+  if(!R.targets.length)R.targets.push({empId:'',pct:''});
+  openModal('<div id="rf"></div>',{});
+  const draw=()=>{const box=$('#rf');
+    const cand=liveEmps().filter(e=>(e.active!==false||e.id===R.whoId)&&(R.cities.length?R.cities.some(ct=>hasRole(e,ct,R.role)):CITIES.some(ct=>hasRole(e,ct.id,R.role))));
+    const all=liveEmps().filter(e=>e.active!==false||R.targets.some(t=>t.empId===e.id));
+    const who=emp(R.whoId);
+    const base=who&&R.cities.length?R.cities.map(ct=>CITY_NAME[ct]+': '+(R.role==='teacher'?'учитель':'тех')+' '+empRate(who,ct,R.role)+'%').join(', '):'';
     box.innerHTML=`<div class="mh"><h2>Правило-доплата</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
-      <div class="field"><label class="lbl">Город</label>${seg('rcity',CITIES,R.city)}</div>
-      <div class="field"><label class="lbl">Если тех специалист =</label><select class="select" id="r-tech"><option value="">— выберите —</option>${techs.map(e=>`<option value="${e.id}" ${R.techId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select></div>
-      ${R.targets.map((t,i)=>`<div class="field"><label class="lbl">то дополнительно получает (${i+1})</label><div class="row"><select class="select grow" data-t-emp="${i}" style="flex:1"><option value="">—</option>${all.map(e=>`<option value="${e.id}" ${t.empId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select><div class="pct"><input class="input" data-t-pct="${i}" inputmode="decimal" value="${esc(t.pct)}">%</div></div></div>`).join('')}
+      <div class="field"><label class="lbl">Условие</label>${seg('rrole',[{id:'teacher',name:'Если учитель ='},{id:'tech',name:'Если тех специалист ='}],R.role)}</div>
+      <div class="field"><select class="select" id="r-who"><option value="">— выберите игрока —</option>${cand.map(e=>`<option value="${e.id}" ${R.whoId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select></div>
+      <div class="field"><label class="lbl">В городах</label><div class="seg" data-rcities>${CITIES.map(ct=>`<button type="button" data-v="${ct.id}" class="${R.cities.includes(ct.id)?'on':''}">${ct.name}</button>`).join('')}</div></div>
+      ${R.targets.map((t,i)=>`<div class="field"><label class="lbl">то дополнительно получает${R.targets.length>1?' ('+(i+1)+')':''}</label><div class="row"><select class="select" data-t-emp="${i}" style="flex:1"><option value="">—</option>${all.map(e=>`<option value="${e.id}" ${t.empId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select><div class="pct"><input class="input" data-t-pct="${i}" inputmode="decimal" value="${esc(t.pct)}">%</div>${R.targets.length>1?`<button type="button" class="btn sm ghost" data-t-del="${i}">✕</button>`:''}</div></div>`).join('')}
       <button class="btn sm" data-add>+ ещё игрок</button>
-      <div class="note">Правило применяется к новым анкетам и к тем, где тех специалист выбран заново. Сохранённые клиенты не пересчитываются.</div>
+      ${base?`<div class="info">Сам ${esc(who.name)} получает по своей ставке: ${esc(base)}. Доплата идёт дополнительно от выручки клиента, получатель может быть в любой роли или без роли.</div>`:''}
+      <div class="note">Пример: «Алматы, Шымкент: если учитель = Перизат, то Нурбек +15%». У Перизат в карточке в этих городах стоит 10%. Правило применяется к новым анкетам и к тем, где учитель или тех специалист выбран заново. Сохранённые клиенты не пересчитываются.</div>
     </div><div class="mf"><button class="btn pri big" data-save>Сохранить</button><button class="btn" data-x>Отмена</button></div>`;
     $$('[data-x]',box).forEach(b=>b.onclick=()=>closeModal());
-    $('[data-seg="rcity"]',box).onclick=e=>{const b=e.target.closest('button');if(!b)return;R.city=b.dataset.v;R.techId='';draw()};
-    $('#r-tech',box).onchange=e=>R.techId=e.target.value;
-    $$('[data-t-emp]',box).forEach(s=>s.onchange=()=>R.targets[s.dataset.tEmp].empId=s.value);
-    $$('[data-t-pct]',box).forEach(s=>s.oninput=()=>R.targets[s.dataset.tPct].pct=s.value);
+    $('[data-seg="rrole"]',box).onclick=e=>{const b=e.target.closest('button');if(!b)return;R.role=b.dataset.v;R.whoId='';draw()};
+    $('#r-who',box).onchange=e=>{R.whoId=e.target.value;draw()};
+    $('[data-rcities]',box).onclick=e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;R.cities=R.cities.includes(v)?R.cities.filter(x=>x!==v):[...R.cities,v];draw()};
+    $$('[data-t-emp]',box).forEach(x=>x.onchange=()=>R.targets[x.dataset.tEmp].empId=x.value);
+    $$('[data-t-pct]',box).forEach(x=>x.oninput=()=>R.targets[x.dataset.tPct].pct=x.value);
+    $$('[data-t-del]',box).forEach(x=>x.onclick=()=>{R.targets.splice(Number(x.dataset.tDel),1);draw()});
     $('[data-add]',box).onclick=()=>{R.targets.push({empId:'',pct:''});draw()};
     $('[data-save]',box).onclick=async()=>{
       const targets=R.targets.filter(t=>t.empId&&num(t.pct)).map(t=>({empId:t.empId,pct:num(t.pct)}));
-      if(!R.techId){toast('Выберите тех специалиста');return}if(!targets.length){toast('Добавьте хотя бы одного игрока с процентом');return}
-      const rule={id:R.id,city:R.city,techId:R.techId,targets,enabled:R.enabled!==false};
-      const rules=c.rules.filter(r=>r.id!==R.id).concat(rule);closeModal();
+      if(!R.whoId){toast('Выберите игрока в условии');return}if(!R.cities.length){toast('Выберите хотя бы один город');return}
+      if(!targets.length){toast('Добавьте получателя доплаты с процентом');return}
+      const rule={id:R.id,role:R.role,whoId:R.whoId,cities:R.cities,city:R.cities[0],techId:R.role==='tech'?R.whoId:'',targets,enabled:R.enabled};
+      const rules=cfg().rules.filter(r=>r.id!==R.id).concat(rule);closeModal();
       try{await saveConfig({rules});toast('Правило сохранено')}catch(e){}
     };};
   draw();
@@ -1511,7 +1530,7 @@ function buildItems(from,to,pf){
     if(x.type==='slot'){const cid=slotOwner(x);const c=cid?S.clients[cid]:null;
       if(!c&&pf.free===false)return;
       items.push({kind:'slot',id:x.id,date:x.date,start:x.start,end,free:!c,color:c?(x.bookKind==='retake'?RETAKE_COLOR:EXAM_COLOR):SLOT_FREE,
-        type:c?(x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam||'')):'Свободен · '+rolesIn(emp(x.playerId),x.city).filter(r=>r!=='sales').map(r=>r==='tech'?'тех':'учитель').join(', '),title:c?c.name:'',who:empName(x.playerId),city:x.city,conf:false});return}
+        type:c?(x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam||'')):'Свободен · '+freeRoleLabel(x),title:c?c.name:'',who:empName(x.playerId),city:isRemote(x.playerId)?'all':x.city,conf:false});return}
     items.push({kind:'ev',id:x.id,date:x.date,start:x.start||'',end,color:evType(x.type).color,type:evType(x.type).name,
       title:x.clientId&&S.clients[x.clientId]?S.clients[x.clientId].name:(x.title||''),who:empName(x.playerId),city:x.city,conf:conflictsOf(x,all.filter(y=>y.type!=='slot')).length>0,comment:x.comment||''})});
   const live=id=>id&&S.sched[id]&&(sessLive(S.sched[id])||(S.sched[id].type==='slot'&&!S.sched[id].deleted&&slotOwner(S.sched[id])));
@@ -1522,10 +1541,15 @@ function buildItems(from,to,pf){
   });
   return items.sort((a,b)=>(a.date+(a.start||'99')).localeCompare(b.date+(b.start||'99')));
 }
+function freeRoleLabel(x){const e=emp(x.playerId);const out=[];
+  if(isRemote(e))out.push('учитель удалённо');else if(rolesIn(e,x.city).includes('teacher'))out.push('учитель');
+  const techC=CITIES.filter(c=>rolesIn(e,c.id).includes('tech')&&(x.city==='all'||isRemote(e)||x.city===c.id));
+  if(techC.length)out.push('тех'+(isRemote(e)||x.city==='all'?' ('+techC.map(c=>c.name).join(', ')+')':''));
+  return out.join(', ')||'—'}
 function schItems(from,to){
   const me=myEmp();const f=S.sch;const mine=schMine()&&me;
   return buildItems(from,to,{free:f.slots!==false,
-    ev:x=>(!f.city||x.city===f.city)&&(!f.player||partIds(x).includes(f.player))&&(!mine||partIds(x).includes(me.id)),
+    ev:x=>(!f.city||x.city===f.city||x.city==='all'||(x.type==='slot'&&isRemote(x.playerId)))&&(!f.player||partIds(x).includes(f.player))&&(!mine||partIds(x).includes(me.id)),
     cl:c=>(!f.city||c.city===f.city)&&(!f.player||c.teacherId===f.player||c.techId===f.player)&&(!mine||c.teacherId===me.id||c.techId===me.id)});
 }
 function schItemsFor(empId,from,to){
@@ -1542,13 +1566,18 @@ function openSlots(date){
     const exist=new Set(liveSched().filter(s=>s.type==='slot'&&s.playerId===X.playerId).map(s=>s.date+'|'+s.start+'|'+s.dur));
     return out.filter(o=>!exist.has(o.date+'|'+fromMin(a)+'|'+(b-a))).slice(0,120)};
   const draw=()=>{const box=$('#slf');
-    const players=liveEmps().filter(e=>e.active!==false&&rolesIn(e,X.city).some(r=>r==='tech'||r==='teacher'));
-    const cities=own?CITIES:CITIES.filter(c=>me&&(me.cities||[]).includes(c.id));
+    const workCities=e=>CITIES.filter(c=>rolesIn(e,c.id).some(r=>r==='tech'||r==='teacher'));
+    const players=liveEmps().filter(e=>e.active!==false&&(isRemote(e)||workCities(e).length));
+    const P=emp(X.playerId);const rem=isRemote(P);
+    const cities=P?workCities(P):(own?CITIES:[]);
+    if(P&&!rem&&cities.length&&!cities.some(c=>c.id===X.city))X.city=cities[0].id;
+    const roleTxt=e=>{const o=[];if(isRemote(e))o.push('учитель удалённо');CITIES.forEach(c=>{const r=rolesIn(e,c.id).filter(x=>x!=='sales'&&!(x==='teacher'&&isRemote(e)));if(r.length)o.push(c.name+': '+r.map(x=>x==='tech'?'тех':'учитель').join(', '))});return o.join(' · ')};
     const n=X.playerId?gen().length:0;const L=cfg().sessionMin;const len=toMin(X.t2)-toMin(X.t1);
     box.innerHTML=`<div class="mh"><h2>Свободное время</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
       <p class="small muted" style="margin-top:0">Отметьте, когда вы свободны. Запись клиенту предлагается только там, где одновременно свободны тех специалист и учитель одного города — минимум ${L/60} ч подряд.</p>
-      <div class="field"><label class="lbl">Город</label>${seg('scity',cities,X.city)}</div>
-      <div class="field"><label class="lbl">Кто</label>${own?`<select class="select" id="sl-player"><option value="">— выберите игрока —</option>${players.map(e=>`<option value="${e.id}" ${X.playerId===e.id?'selected':''}>${esc(e.name)} · ${rolesIn(e,X.city).filter(r=>r!=='sales').map(r=>r==='tech'?'тех специалист':'учитель').join(', ')}</option>`).join('')}</select>`:`<div><b>${esc(me?me.name:'')}</b> · ${rolesIn(me,X.city).filter(r=>r!=='sales').map(r=>r==='tech'?'тех специалист':'учитель').join(', ')||'<span style="color:var(--warn)">нет роли учителя/тех в этом городе</span>'}</div>`}</div>
+      <div class="field"><label class="lbl">Кто</label>${own?`<select class="select" id="sl-player"><option value="">— выберите игрока —</option>${players.map(e=>`<option value="${e.id}" ${X.playerId===e.id?'selected':''}>${esc(e.name)} · ${esc(roleTxt(e))}</option>`).join('')}</select>`:`<div><b>${esc(me?me.name:'')}</b> · ${esc(me?roleTxt(me):'')||'<span style="color:var(--warn)">нет роли учителя или тех специалиста</span>'}</div>`}</div>
+      ${!P?'':rem?`<div class="info"><b>Все города.</b> ${esc(P.name)} — учитель удалённо: это время подходит для клиентов любого города${workCities(P).some(c=>rolesIn(P,c.id).includes('tech'))?', а как тех специалист — только для '+workCities(P).filter(c=>rolesIn(P,c.id).includes('tech')).map(c=>c.name).join(', '):''}.</div>`
+        :`<div class="field"><label class="lbl">Город</label>${seg('scity',cities,X.city)}</div>`}
       <div class="grid2"><div class="field"><label class="lbl">С даты</label><input type="date" class="input" id="sl-from" value="${X.from}"></div><div class="field"><label class="lbl">По дату</label><input type="date" class="input" id="sl-to" value="${X.to}"></div></div>
       <div class="field"><label class="lbl">Дни недели</label><div class="seg" data-sdays>${WD.map((w,i)=>`<button type="button" data-v="${i}" class="${X.days.includes(i)?'on':''}">${w}</button>`).join('')}</div>
         <div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn sm" data-preset="wd">Будни</button><button type="button" class="btn sm" data-preset="we">Выходные</button><button type="button" class="btn sm" data-preset="all">Каждый день</button></div></div>
@@ -1557,7 +1586,7 @@ function openSlots(date){
       <div class="${len<L?'note':'info'}">${!X.playerId?'Выберите игрока.':len<L?`Окно короче длительности записи (${L/60} ч) — в нём нельзя будет записать клиента.`:`Будет добавлено дней: <b>${n}</b>. Уже добавленные такие же окна пропускаются.`}</div>
     </div><div class="mf"><button class="btn pri big" data-save ${n&&S.canWrite&&toMin(X.t2)>toMin(X.t1)?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button></div>`;
     $$('[data-x]',box).forEach(b=>b.onclick=()=>closeModal());
-    $('[data-seg="scity"]',box).onclick=e=>{const b=e.target.closest('button');if(!b)return;X.city=b.dataset.v;if(own)X.playerId='';draw()};
+    const scs=$('[data-seg="scity"]',box);if(scs)scs.onclick=e=>{const b=e.target.closest('button');if(!b)return;X.city=b.dataset.v;draw()};
     $('[data-sdays]',box).onclick=e=>{const b=e.target.closest('button');if(!b)return;const i=Number(b.dataset.v);X.days=X.days.includes(i)?X.days.filter(x=>x!==i):[...X.days,i];draw()};
     $$('[data-preset]',box).forEach(b=>b.onclick=()=>{X.days=b.dataset.preset==='wd'?[0,1,2,3,4]:b.dataset.preset==='we'?[5,6]:[0,1,2,3,4,5,6];draw()});
     $$('[data-tp]',box).forEach(b=>b.onclick=()=>{[X.t1,X.t2]=b.dataset.tp.split('|');draw()});
@@ -1568,7 +1597,7 @@ function openSlots(date){
     $('#sl-t2',box).onchange=e=>{X.t2=e.target.value;draw()};
     $('[data-save]',box).onclick=async()=>{const list=gen();if(!list.length)return;closeModal();const a=toMin(X.t1),b=toMin(X.t2);
       toast('Сохраняю: '+list.length+' дн.…');
-      try{for(const o of list)await setDoc(BASE+'/schedule/'+newId('schedule'),{type:'slot',date:o.date,start:fromMin(a),dur:b-a,city:X.city,playerId:X.playerId,clientId:'',bookKind:'',deleted:false,createdAt:nowIso(),createdBy:S.uid||''});
+      try{for(const o of list)await setDoc(BASE+'/schedule/'+newId('schedule'),{type:'slot',date:o.date,start:fromMin(a),dur:b-a,city:isRemote(X.playerId)?'all':X.city,playerId:X.playerId,clientId:'',bookKind:'',deleted:false,createdAt:nowIso(),createdBy:S.uid||''});
         toast('Свободное время добавлено: '+list.length+' дн.')}catch(e){}};
   };
   draw();
@@ -1583,7 +1612,7 @@ function openSlot(id){
   const inside=liveSched().filter(x=>x.type==='session'&&sessLive(x)&&x.date===s.date&&partIds(x).includes(s.playerId)&&toMin(x.start)<b&&toMin(x.start)+num(x.dur)>a);
   const m=openModal(`<div class="mh"><h2>Свободное время</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
     <div class="kpis" style="grid-template-columns:1fr 1fr;margin-bottom:12px"><div class="kpi"><div class="k">Когда</div><div class="v" style="font-size:18px">${WD[(new Date(s.date+'T00:00:00').getDay()+6)%7]}, ${dshow(s.date)}<br>${s.start}–${fromMin(b)}</div></div>
-    <div class="kpi"><div class="k">Кто</div><div class="v" style="font-size:18px">${esc(empName(s.playerId))}<br><span class="small muted">${esc(CITY_NAME[s.city]||'')}</span></div></div></div>
+    <div class="kpi"><div class="k">Кто</div><div class="v" style="font-size:18px">${esc(empName(s.playerId))}<br><span class="small muted">${esc(cityLabel(isRemote(s.playerId)?'all':s.city))}</span></div></div></div>
     ${inside.length?`<div class="small"><b>Записи в это время:</b>${inside.map(x=>`<div style="padding:4px 0">${x.start}–${fromMin(toMin(x.start)+num(x.dur))} · ${esc(S.clients[x.clientId].name)} · ${esc(pairName(x))}</div>`).join('')}</div>`:'<div class="small muted">Записей пока нет. Клиента записывают через анкету: «Дата экзамена» → «По связкам».</div>'}
   </div><div class="mf"><button class="btn" data-x>Закрыть</button><div class="grow"></div>${canEdit?'<button class="btn danger" data-del>Удалить это окно</button>':''}</div>`,{cls:'narrow'});
   $$('[data-x]',m).forEach(b=>b.onclick=()=>closeModal());
@@ -1684,7 +1713,7 @@ function evHtml(it,showCity){
   return `<div class="ev ${it.conf?'conf':''} ${it.free?'free':''}" style="--ec:${it.color}" ${it.kind==='exam'?`data-cid="${it.id}"`:it.kind==='slot'?`data-slot="${it.id}"`:it.kind==='session'?`data-sess="${it.id}"`:`data-ev="${it.id}"`} title="${esc(it.comment||'')}">
     <div>${it.start?`<span class="tm">${it.start}${it.end?'–'+it.end:''}</span> `:''}<span class="ty">${esc(it.type)}</span></div>
     ${it.title?`<div><b>${esc(it.title)}</b></div>`:''}
-    <div class="who2">${esc([it.who,showCity?CITY_NAME[it.city]:''].filter(Boolean).join(' · '))}</div>
+    <div class="who2">${esc([it.who,showCity?cityLabel(it.city):''].filter(Boolean).join(' · '))}</div>
     ${it.conf?'<div style="color:var(--danger);font-weight:600">Пересечение по времени</div>':''}</div>`;
 }
 function viewSchedule(){
@@ -1706,7 +1735,7 @@ function viewSchedule(){
     if(!items.length)return tb+'<div class="card empty"><b>На ближайшие 4 недели ничего не запланировано</b>Нажмите «+ Добавить клиента», чтобы назначить экзамен на дату и время, или «+ Свободное время», чтобы отметить, когда вы свободны.</div>';
     let last='';
     return tb+`<div class="tablewrap"><table class="t"><thead><tr><th>Дата</th><th>Время</th><th>Тип</th><th>Клиент</th><th>Кто ведёт</th><th>Город</th></tr></thead><tbody>${items.map(it=>{const dd=it.date!==last;last=it.date;const wd=WD[(new Date(it.date+'T00:00:00').getDay()+6)%7];
-      return `<tr class="click" ${it.kind==='exam'?`data-cid="${it.id}"`:it.kind==='slot'?`data-slot="${it.id}"`:it.kind==='session'?`data-sess="${it.id}"`:`data-ev="${it.id}"`}><td>${dd?'<b>'+wd+', '+dshow(it.date)+'</b>':''}</td><td class="num">${it.start||'—'}${it.end?'–'+it.end:''}</td><td><span class="chip"><span class="dot" style="background:${it.color}"></span>${esc(it.type)}</span>${it.conf?' <span style="color:var(--danger)" class="small">пересечение</span>':''}</td><td>${esc(it.title||'—')}</td><td>${esc(it.who||'—')}</td><td>${esc(CITY_NAME[it.city]||'')}</td></tr>`}).join('')}</tbody></table></div>`;
+      return `<tr class="click" ${it.kind==='exam'?`data-cid="${it.id}"`:it.kind==='slot'?`data-slot="${it.id}"`:it.kind==='session'?`data-sess="${it.id}"`:`data-ev="${it.id}"`}><td>${dd?'<b>'+wd+', '+dshow(it.date)+'</b>':''}</td><td class="num">${it.start||'—'}${it.end?'–'+it.end:''}</td><td><span class="chip"><span class="dot" style="background:${it.color}"></span>${esc(it.type)}</span>${it.conf?' <span style="color:var(--danger)" class="small">пересечение</span>':''}</td><td>${esc(it.title||'—')}</td><td>${esc(it.who||'—')}</td><td>${esc(cityLabel(it.city))}</td></tr>`}).join('')}</tbody></table></div>`;
   }
   const items=schItems(mon,sun);const td=today();
   const days=[0,1,2,3,4,5,6].map(i=>{const d=addDays(mon,i);const its=items.filter(x=>x.date===d);
