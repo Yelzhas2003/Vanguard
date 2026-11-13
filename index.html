@@ -665,7 +665,7 @@ function kcard(c,s,own,me,showCity){
     ${closedOutcome(c)?(closedOutcome(c)==='good'?'<span style="color:var(--ok);font-weight:600">Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):'')+'</span><br>':'<span style="color:var(--danger);font-weight:600">Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':'')+'</span>'+(c.closed&&(c.closed.reasons||[]).length?'<br>Причина: '+c.closed.reasons.map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', '):'')+'<br>'):''}
     ${c.retake?'<span style="font-weight:600">Пересдача '+(c.retake.kind==='paid'?'платная'+(c.retake.fee?' +'+money(c.retake.fee):''):c.retake.kind==='free'?'бесплатная':c.retake.kind==='expense'?'расходная'+(c.retake.fee?' −'+money(c.retake.fee):''):'')+'</span>'+(c.retake.date?' · '+dshow(c.retake.date)+(c.retake.time?' '+c.retake.time:''):' · дата не выбрана')+'<br>':''}
     ${num(c.refund)?'<span style="color:var(--danger);font-weight:600">Возврат '+money(c.refund)+(c.refundMode==='pct'&&c.refundPct!==''?' ('+c.refundPct+'%)':'')+'</span><br>':''}
-    ${money(r.cost)} · ${planOf(c)==='100'?'100%':planOf(c)==='custom'?'оплачено '+r.pct+'%':planOf(c)+' (оплачено '+r.pct+'%)'}<br>
+    ${money(r.cost)} · ${planOf(c)==='100'?'оплата 100%':planOf(c)==='custom'?'оплачено '+r.pct+'%':'оплата '+planOf(c)}<br>
     Продал: ${esc(empName(c.soldBy))}<br>
     ${statusById(c.status).id!=='bron'?'Связка: '+esc(empName(c.techId))+' + '+esc(empName(c.teacherId))+(c.address?'<br>Адрес: '+esc(c.address):''):''}</div>
     ${own?`<div class="tot"><span class="small muted">Итого Vanguard</span><b>${money(r.vanguard)}</b></div>`:(mine?`<div class="tot"><span class="small muted">Ваша доля</span><b>${money(mine)}</b></div>`:'')}
@@ -701,7 +701,7 @@ const PAY_PLANS={'100':[100],'50/50':[50,50],'60/40':[60,40],'40/30/30':[40,30,3
 function planOf(c){if(c.payPlan&&(PAY_PLANS[c.payPlan]||c.payPlan==='custom'))return c.payPlan;if(c.paidMode==='100'||c.paidMode===undefined)return '100';if(c.paidMode==='50')return '50/50';return 'custom'}
 function partsOf(c){const pl=planOf(c);if(pl==='custom')return [];const n=PAY_PLANS[pl].length;if(Array.isArray(c.payParts)&&c.payParts.length===n)return c.payParts.slice();
   if(pl==='100')return [true];if(c.paidMode==='50')return [true,false];return PAY_PLANS[pl].map((_,i)=>i===0)}
-function pctFromParts(pl,parts){return PAY_PLANS[pl].reduce((a,p,i)=>a+(parts[i]?p:0),0)}
+function pctFromParts(pl,parts){return 100}
 function blankClient(city){
   return {id:null,name:'',exam:'IELTS',examOther:'',city:city||'astana',examDate:'',examTime:'',dateMode:'tbd',slotId:'',level:'',target:'',deadline:'',closed:null,payDate:today(),cost:'',paidMode:'100',paidPct:100,payPlan:'100',payParts:[true],
     soldBy:'',teacherId:'',techId:'',status:cfg().statuses[0].id,addon:'none',refund:0,refundMode:'pct',refundPct:'',refundComment:'',retake:null,expense:0,comment:'',rates:{teacher:0,tech:0,sales:0,extras:[]}};
@@ -852,7 +852,7 @@ function drawClientForm(){
       <div class="field"><label class="lbl">Условия оплаты</label>${seg('payplan',[{id:'100',name:'100%'},{id:'other',name:'Другое'}],c.payPlan==='100'?'100':'other')}
         ${c.payPlan!=='100'?`<div style="margin-top:8px">${seg('payplan2',[{id:'50/50',name:'50 / 50'},{id:'60/40',name:'60 / 40'},{id:'40/30/30',name:'40 / 30 / 30'}],c.payPlan)}</div>`:''}
         ${c.payPlan==='custom'?`<div class="pct" style="margin-top:8px"><span class="small muted">Оплачено</span><input class="input" id="c-paidPct" inputmode="decimal" value="${esc(c.paidPct)}"><span>%</span></div>`
-          :`<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">${PAY_PLANS[c.payPlan].map((p,i)=>`<label class="check small"><input type="checkbox" data-part="${i}" ${c.payParts[i]?'checked':''}> ${PAY_PLANS[c.payPlan].length>1?(i+1)+'-й платёж '+p+'%':'Оплачено 100%'}${num(c.cost)?' — '+money(Math.round(num(c.cost)*p/100)):''} · оплачено</label>`).join('')}</div>`}</div>
+          :(PAY_PLANS[c.payPlan].length>1&&num(c.cost)?`<div class="small muted" style="margin-top:8px">${PAY_PLANS[c.payPlan].map((p,i)=>(i+1)+'-й платёж: '+money(Math.round(num(c.cost)*p/100))).join(' · ')}</div>`:'')}</div>
     </div>
     <div class="field"><label class="lbl">Кто продал <span style="color:var(--danger)">*</span></label><select class="select" id="c-soldBy" style="max-width:420px"><option value="" ${!c.soldBy?'selected':''}>— выберите —</option><option value="self" ${c.soldBy==='self'?'selected':''}>Сами пришли</option>${opt(sellerList(c.city,c.soldBy),c.soldBy)}</select></div>
     ${c.status!=='bron'?`<div class="grid2">
@@ -937,7 +937,7 @@ function drawCalc(){
   const lines=r.shares.map(s=>`<div class="cl"><span>${ROLE_NAME[s.role]} · ${esc(empName(s.empId))} <span class="muted">${s.pct}%</span></span><span>− ${money(s.amount)}</span></div>`).join('');
   const multi=Object.entries(r.byEmp).filter(([id])=>r.shares.filter(s=>s.empId===id).length>1);
   el.innerHTML=`<h4>Расчёт</h4>
-   <div class="cl"><span>Оплачено (${money(r.cost)} × ${r.pct}%${F.payPlan&&F.payPlan!=='100'&&F.payPlan!=='custom'?', план '+F.payPlan:''})</span><span>${money(r.paid)}</span></div>
+   <div class="cl"><span>${F.payPlan==='custom'?'Оплачено ('+money(r.cost)+' × '+r.pct+'%)':'Стоимость'+(F.payPlan&&F.payPlan!=='100'?' (оплата '+F.payPlan+')':'')}</span><span>${money(r.paid)}</span></div>
    ${r.fee?`<div class="cl"><span>Платная пересдача</span><span>+ ${money(r.fee)}</span></div>`:''}
    ${r.refund?`<div class="cl"><span>Возврат</span><span>− ${money(r.refund)}</span></div>`:''}
    <div class="cl"><span><b>Общая выручка</b></span><span>${money(r.revenue)}</span></div>
