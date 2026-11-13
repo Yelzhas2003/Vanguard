@@ -776,13 +776,15 @@ function optLabel(o){if(!o)return '';const wd=WD[(new Date(o.date+'T00:00:00').g
 const PICK={};
 function pairPicker(key){
   const cur=key==='main'?F.sess:(F.retake&&F.retake.sess);
-  let list=pairOptions(F.city,F.id,today(),addDays(today(),35));
-  const prefT=F.techId,prefU=F.teacherId;
-  const isPref=o=>o.techId===prefT&&o.teacherId===prefU;
+  const fT=F.techId,fU=F.teacherId;
+  let list=pairOptions(F.city,F.id,today(),addDays(today(),35)).filter(o=>(!fT||o.techId===fT)&&(!fU||o.teacherId===fU));
+  const prefT=fT,prefU=fU;
+  const isPref=o=>false;
   PICK[key]=list;
+  if(!list.length&&(fT||fU))return `<div class="info" style="margin-top:8px">У ${esc([fT?empName(fT):'',fU?empName(fU):''].filter(Boolean).join(' + '))} нет общего свободного времени на ${cfg().sessionMin/60} ч в ближайшие 5 недель. Выберите «— любой —» или другого игрока.</div>`;
   if(!list.length)return `<div class="info" style="margin-top:8px">В городе ${esc(CITY_NAME[F.city])} нет совпадений: тех специалист и учитель должны оба быть свободны ${cfg().sessionMin/60} ч подряд. Игроки добавляют слоты в «Моём кабинете» или в «Расписании» → «+ Добавить слот».</div>`;
   const byDate={};list.forEach((o,i)=>(byDate[o.date]=byDate[o.date]||[]).push([o,i]));
-  return `${prefT&&prefU?`<div class="tiny muted" style="margin-top:8px">★ — текущая связка клиента: ${esc(pairName({techId:prefT,teacherId:prefU}))}</div>`:''}
+  return `<div class="tiny muted" style="margin-top:8px">${fT&&fU?'Показано время только связки '+esc(pairName({techId:fT,teacherId:fU})):fT?'Тех специалист '+esc(empName(fT))+' со всеми учителями':fU?'Учитель '+esc(empName(fU))+' со всеми тех специалистами':'Все возможные связки города'} — меняется полями «Учитель» и «Тех специалист» выше.</div>
   <div style="margin-top:8px;max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:4px 10px">${Object.entries(byDate).map(([d,arr])=>{
     arr.sort((a,b)=>(isPref(b[0])-isPref(a[0]))||a[0].start.localeCompare(b[0].start));
     return `<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)">
@@ -857,8 +859,8 @@ function drawClientForm(){
     </div>
     <div class="field"><label class="lbl">Кто продал <span style="color:var(--danger)">*</span></label><select class="select" id="c-soldBy" style="max-width:420px"><option value="" ${!c.soldBy?'selected':''}>— выберите —</option><option value="self" ${c.soldBy==='self'?'selected':''}>Сами пришли</option>${opt(sellerList(c.city,c.soldBy),c.soldBy)}</select></div>
     ${c.status!=='bron'?`<div class="grid2">
-      <div class="field"><label class="lbl">Учитель</label><select class="select" id="c-teacherId">${opt(teacherList(c.city,c.teacherId),c.teacherId,'— не выбран —')}</select></div>
-      <div class="field"><label class="lbl">Тех специалист</label><select class="select" id="c-techId">${opt(techList(c.city,c.techId),c.techId,'— не выбран —')}</select></div>
+      <div class="field"><label class="lbl">Учитель</label><select class="select" id="c-teacherId">${opt(teacherList(c.city,c.teacherId),c.teacherId,'— любой —')}</select></div>
+      <div class="field"><label class="lbl">Тех специалист</label><select class="select" id="c-techId">${opt(techList(c.city,c.techId),c.techId,'— любой —')}</select></div>
     </div>`:''}
     ${c.status!=='bron'&&(!teacherList(c.city).length||!techList(c.city).length)?`<div class="info">В городе ${esc(CITY_NAME[c.city])} ${!teacherList(c.city).length?'нет активных учителей':''}${!teacherList(c.city).length&&!techList(c.city).length?' и ':''}${!techList(c.city).length?'нет активных тех специалистов':''}. Добавьте их в разделе «Игроки».</div>`:''}
     <div class="field"><label class="lbl">Статус</label><div class="seg status" data-seg="status">${st.map(s=>`<button type="button" data-v="${s.id}" class="${c.status===s.id?'on':''}" style="--sc:${s.color}"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</button>`).join('')}</div>
@@ -994,7 +996,10 @@ function bindClientForm(box){
   const rp=$('#c-refundPct',box);if(rp)rp.oninput=()=>{F.refundPct=Math.min(100,Math.max(0,num(rp.value)));recalcRefund();drawCalc()};
   $$('[data-part]',box).forEach(el=>el.onchange=()=>{F.payParts[Number(el.dataset.part)]=el.checked;F.paidPct=pctFromParts(F.payPlan,F.payParts);recalcRefund();drawCalc()});
   const pp=$('#c-paidPct',box);if(pp)pp.oninput=()=>{F.paidPct=Math.min(100,Math.max(0,num(pp.value)));recalcRefund();drawCalc()};
-  [['c-teacherId','teacherId','teacher'],['c-techId','techId','tech'],['c-soldBy','soldBy','sales']].forEach(([id,k,role])=>{const el=$('#'+id,box);if(el)el.onchange=()=>{F[k]=el.value;applyRates([role]);drawClientForm()}});
+  [['c-teacherId','teacherId','teacher'],['c-techId','techId','tech'],['c-soldBy','soldBy','sales']].forEach(([id,k,role])=>{const el=$('#'+id,box);if(el)el.onchange=()=>{F[k]=el.value;applyRates([role]);
+    if(role!=='sales'){const bad=o=>o&&((F.techId&&o.techId!==F.techId)||(F.teacherId&&o.teacherId!==F.teacherId));
+      if(bad(F.sess)){F.sess=null;F.examDate='';F.examTime=''}if(F.retake&&bad(F.retake.sess)){F.retake.sess=null;F.retake.date='';F.retake.time=''}}
+    drawClientForm()}});
   ['teacher','tech','sales'].forEach(k=>{const el=$('#r-'+k,box);if(el)el.oninput=()=>{F.rates[k]=num(el.value);drawCalc()}});
   const act=a=>$(`[data-act="${a}"]`,box);
   if(act('dropRetake'))act('dropRetake').onclick=()=>{F.retake=null;recalcRefund();drawClientForm()};
@@ -1117,6 +1122,7 @@ function openEmp(id){
   const rb={};CITIES.forEach(c=>rb[c.id]=src?rolesIn(src,c.id):[]);
   if(src&&isRemote(src))CITIES.forEach(c=>{if(!rb[c.id].includes('teacher'))rb[c.id].push('teacher')});
   E.rc={};['teacher','tech','sales'].forEach(r=>{const cs=CITIES.filter(c=>rb[c.id].includes(r)).map(c=>c.id);E.rc[r]={on:cs.length>0,cities:cs}});
+  if(E.rc.teacher.on)E.rc.teacher.cities=CITIES.map(c=>c.id);
   E.rates=E.rates||{};
   E.owner=(E.roles||[]).includes('owner');
   E._origRates=src?JSON.stringify(src.rates||{}):null;
@@ -1125,7 +1131,7 @@ function openEmp(id){
 function ensureRates(){
   ['teacher','tech','sales'].forEach(r=>{if(!E.rc[r].on)return;E.rc[r].cities.forEach(c=>{E.rates[c]=E.rates[c]||{};if(E.rates[c][r]===undefined||E.rates[c][r]===''||(!num(E.rates[c][r])&&!E._touched&&r!=='sales'))E.rates[c][r]=DEFAULT_RATES[c][r]})});
 }
-const ROLE_BOX=[{id:'teacher',name:'Учитель',hint:'Работает удалённо — обычно во всех трёх городах. Процент можно задать свой для каждого города.',def:['astana','almaty','shymkent']},
+const ROLE_BOX=[{id:'teacher',name:'Учитель',hint:'Учитель автоматически работает во всех трёх городах. Укажите процент для каждого города.',def:['astana','almaty','shymkent'],allCities:true},
   {id:'tech',name:'Тех специалист',hint:'Привязан к своему городу — отметьте город (обычно один).',def:[]},
   {id:'sales',name:'Продажник',hint:'Получает процент с клиентов, которых привёл.',def:['astana','almaty','shymkent']}];
 function drawEmpForm(){
@@ -1140,8 +1146,8 @@ function drawEmpForm(){
     <div style="display:flex;flex-direction:column;gap:10px">${ROLE_BOX.map(R=>{const rc=E.rc[R.id];return `<div style="border:1px solid ${rc.on?'var(--accent)':'var(--line)'};border-radius:12px;padding:14px 16px">
       <label class="check" style="font-weight:650;font-size:16px"><input type="checkbox" data-role-on="${R.id}" ${rc.on?'checked':''}> ${R.name}</label>
       ${rc.on?`<div class="tiny muted" style="margin:4px 0 10px 28px">${R.hint}</div>
-        <div style="margin-left:28px;display:flex;flex-direction:column;gap:8px">${CITIES.map(c=>{const inC=rc.cities.includes(c.id);const dis=R.id==='sales'&&E.noSales;return `<div class="row" style="gap:12px;flex-wrap:nowrap">
-          <label class="check small" style="width:110px;flex:none"><input type="checkbox" data-role-city="${R.id}.${c.id}" ${inC?'checked':''}> ${c.name}</label>
+        <div style="margin-left:28px;display:flex;flex-direction:column;gap:8px">${CITIES.map(c=>{const inC=R.allCities||rc.cities.includes(c.id);const dis=R.id==='sales'&&E.noSales;return `<div class="row" style="gap:12px;flex-wrap:nowrap">
+          ${R.allCities?`<span class="small" style="width:110px;flex:none;font-weight:600">${c.name}</span>`:`<label class="check small" style="width:110px;flex:none"><input type="checkbox" data-role-city="${R.id}.${c.id}" ${inC?'checked':''}> ${c.name}</label>`}
           ${inC?(dis?'<span class="small muted">0% (без процента за продажу)</span>':`<div class="pct"><input class="input" data-rate="${c.id}.${R.id}" inputmode="decimal" value="${num((E.rates[c.id]||{})[R.id])}">%</div>${R.id!=='sales'&&RATE_HINTS[c.id][R.id]?`<span class="tiny muted">${RATE_HINTS[c.id][R.id]}</span>`:''}`):'<span class="tiny muted">не работает в этом городе</span>'}
         </div>`}).join('')}</div>`:''}
     </div>`}).join('')}</div>
@@ -1158,7 +1164,7 @@ function drawEmpForm(){
   <div class="mf"><button class="btn pri big" data-save ${S.canWrite?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button></div>`;
   $$('[data-x]',box).forEach(b=>b.onclick=()=>closeModal());
   $('#e-name',box).oninput=e=>E.name=e.target.value;
-  $$('[data-role-on]',box).forEach(el=>el.onchange=()=>{const R=ROLE_BOX.find(x=>x.id===el.dataset.roleOn);const rc=E.rc[R.id];rc.on=el.checked;if(rc.on&&!rc.cities.length)rc.cities=R.def.slice();drawEmpForm()});
+  $$('[data-role-on]',box).forEach(el=>el.onchange=()=>{const R=ROLE_BOX.find(x=>x.id===el.dataset.roleOn);const rc=E.rc[R.id];rc.on=el.checked;if(rc.on&&(R.allCities||!rc.cities.length))rc.cities=R.def.slice();drawEmpForm()});
   $$('[data-role-city]',box).forEach(el=>el.onchange=()=>{const [r,c]=el.dataset.roleCity.split('.');const rc=E.rc[r];rc.cities=el.checked?[...new Set([...rc.cities,c])]:rc.cities.filter(x=>x!==c);drawEmpForm()});
   $('#e-owner',box).onchange=e=>{E.owner=e.target.checked;if(E.owner)E.noSales=true;drawEmpForm()};
   $('#e-noSales',box).onchange=e=>{E.noSales=e.target.checked;drawEmpForm()};
