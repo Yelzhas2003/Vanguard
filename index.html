@@ -284,6 +284,17 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
 .app.mini .side:not(:hover) .nav{margin-top:6px}
 .app.mini .side:hover{width:240px;box-shadow:10px 0 34px rgba(0,0,0,.28)}
 .side .nav a,.side .logo{white-space:nowrap}
+.main{transition:margin-left .18s ease}
+@media (min-width:861px){.app.mini:has(.side:hover) .main{margin-left:240px}.app.mini .side:hover{box-shadow:none}}
+:root[data-theme="dark"] .side{background:#F4F6FA!important;border-right:0!important;color:#1A2233;box-shadow:0 0 30px rgba(255,255,255,.08)}
+:root[data-theme="dark"] .side .logo{color:#0E1320}
+:root[data-theme="dark"] .side .logo small{color:#5D687A}
+:root[data-theme="dark"] .side .logo i.lg img{filter:invert(1)}
+:root[data-theme="dark"] .side .nav a{color:#1A2233;transition:background .15s,box-shadow .15s,color .15s}
+:root[data-theme="dark"] .side .nav .grp,:root[data-theme="dark"] .side .ver{color:#7A8597}
+:root[data-theme="dark"] .side .nav a:hover{background:#0B0D12;color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.5),0 0 10px rgba(150,215,255,.6),0 0 22px rgba(150,215,255,.35)}
+:root[data-theme="dark"] .side .nav a.on{background:#0B0D12;color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,.7),0 0 12px rgba(150,215,255,.8),0 0 28px rgba(150,215,255,.45)}
+:root[data-theme="dark"] .side .nav a:active{background:#000}
 @media (max-width:860px){#sidetoggle{display:none}.app.mini .main{margin-left:0}.app.mini .side{width:240px}.app.mini .side .nl,.app.mini .side .grp,.app.mini .side .logo>div{display:revert!important}}
 @media (max-width:860px){
   .side{position:fixed;left:0;top:0;z-index:60;transform:translateX(-100%);transition:transform .2s;box-shadow:0 0 40px rgba(0,0,0,.2)}
@@ -313,7 +324,7 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 15:00</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 15:20</div>
   </aside>
   <div class="main">
     <header class="top">
