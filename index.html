@@ -355,6 +355,14 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
 @media (max-width:1100px){.mebanner{grid-template-columns:1fr 1fr}.mb-left{grid-column:1/-1}}
 @media (max-width:640px){.mebanner{grid-template-columns:1fr;padding:18px}}
 .emp .ava{margin-right:10px}
+
+.ava{border-radius:50%!important}
+.mb-avawrap{position:relative;cursor:pointer;flex:none;border-radius:50%}
+.mb-cam{position:absolute;right:-2px;bottom:-2px;width:28px;height:28px;border-radius:50%;background:#fff;color:#1C3354;display:grid;place-items:center;box-shadow:0 2px 8px rgba(0,0,0,.3);transition:transform .15s}
+.mb-cam .i{width:15px;height:15px}
+.mb-avawrap:hover .mb-cam{transform:scale(1.12)}
+.mb-avawrap:hover .mb-ava{filter:brightness(.85)}
+.mb-rm{font-size:11.5px;color:rgba(255,255,255,.6)!important;text-decoration:underline;display:inline-block;margin-top:6px}
 </style>
 </head>
 <body>
@@ -362,7 +370,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 17:30</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 17:50</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -682,8 +690,10 @@ const KIC={
 function kpi(ic,label,value,o){o=o||{};
   let d='';if(o.delta!==undefined){const v=o.delta;d=v===null?'<span class="dl dl0">—</span>':v>0?`<span class="dl up">↑ +${v}%</span>`:v<0?`<span class="dl dn">↓ ${v}%</span>`:'<span class="dl dl0">0%</span>'}
   return `<div class="kpi ${o.hero?'hero':''}"><div class="kh">${ic?`<svg class="i" viewBox="0 0 24 24">${KIC[ic]||IC[ic]||''}</svg>`:''}<span>${label}</span></div><div class="kv"><div class="v">${value}</div>${d}</div>${o.sub?`<div class="tiny muted" style="margin-top:2px">${o.sub}</div>`:''}</div>`}
-function avatar(e,size,cls){size=size||40;const st=`width:${size}px;height:${size}px;border-radius:${Math.round(size*.28)}px;flex:none`;
+function avatar(e,size,cls){size=size||40;const st=`width:${size}px;height:${size}px;border-radius:50%;flex:none`;
   return e&&e.photo?`<img class="ava ${cls||''}" src="${e.photo}" alt="" style="${st};object-fit:cover">`:`<div class="ava ${cls||''}" style="${st};background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:800;font-size:${Math.round(size*.42)}px">${esc(((e&&e.name)||'?').slice(0,1).toUpperCase())}</div>`}
+function photoFromFile(f,cb){if(!f)return;if(!/^image\//.test(f.type||'image/')){toast('Нужна картинка');return}const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const z=320,cv=document.createElement('canvas');cv.width=cv.height=z;
+  const k=Math.min(im.width,im.height)*.92;const g=cv.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,z,z);g.drawImage(im,(im.width-k)/2,(im.height-k)/2,k,k,0,0,z,z);cb(cv.toDataURL('image/jpeg',.86))};im.onerror=()=>toast('Не удалось открыть картинку');im.src=rd.result};rd.readAsDataURL(f)}
 function pctDelta(cur,prev){if(!prev)return cur?null:0;return Math.round((cur-prev)/Math.abs(prev)*100)}
 function icon(k){return '<svg class="i" viewBox="0 0 24 24">'+(IC[k]||KIC[k]||'')+'</svg>'}
 const ROUTES=[
@@ -752,6 +762,8 @@ function render(){
   bindView(r);
   if(r==='analytics')drawAnalytics();
   if(r==='me')drawMe();
+  if(r==='me'){const mp=$('#me-photo',v);const me=myEmp();if(mp&&me)mp.onchange=()=>photoFromFile(mp.files[0],async d=>{try{await updDoc(BASE+'/employees/'+me.id,{photo:d,updatedAt:nowIso()});toast('Фото обновлено')}catch(e){}});
+    const rm=$('[data-act="rmPhoto"]',v);if(rm&&me)rm.onclick=async e=>{e.preventDefault();try{await updDoc(BASE+'/employees/'+me.id,{photo:'',updatedAt:nowIso()});toast('Фото убрано')}catch(x){}}}
   if(r==='leads')bindLeads(v);
   if(r==='sales'){bindSales(v);drawSales()}
 }
@@ -1391,8 +1403,7 @@ function drawEmpForm(){
   <div class="mf"><button class="btn pri big" data-save ${S.canWrite?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button></div>`;
   $$('[data-x]',box).forEach(b=>b.onclick=()=>closeModal());
   $('#e-name',box).oninput=e=>E.name=e.target.value;
-  const ph=$('#e-photo',box);if(ph)ph.onchange=()=>{const f=ph.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const z=256,cv=document.createElement('canvas');cv.width=cv.height=z;const k=Math.min(im.width,im.height);
-    cv.getContext('2d').drawImage(im,(im.width-k)/2,(im.height-k)/2,k,k,0,0,z,z);E.photo=cv.toDataURL('image/jpeg',.85);drawEmpForm()};im.onerror=()=>toast('Не удалось открыть картинку');im.src=rd.result};rd.readAsDataURL(f)};
+  const ph=$('#e-photo',box);if(ph)ph.onchange=()=>photoFromFile(ph.files[0],d=>{E.photo=d;drawEmpForm()});
   const pd=$('#e-photo-del',box);if(pd)pd.onclick=()=>{E.photo='';drawEmpForm()};
   $$('[data-role-on]',box).forEach(el=>el.onchange=()=>{const R=ROLE_BOX.find(x=>x.id===el.dataset.roleOn);const rc=E.rc[R.id];rc.on=el.checked;if(rc.on&&(R.allCities||!rc.cities.length))rc.cities=R.def.slice();drawEmpForm()});
   $$('[data-role-city]',box).forEach(el=>el.onchange=()=>{const [r,c]=el.dataset.roleCity.split('.');const rc=E.rc[r];rc.cities=el.checked?[...new Set([...rc.cities,c])]:rc.cities.filter(x=>x!==c);drawEmpForm()});
@@ -2005,10 +2016,10 @@ function viewMe(){
   const cdown=it=>{if(!it.start&&it.date===today())return 'сегодня';const t=new Date(it.date+'T'+(it.start||'09:00')+':00').getTime()-Date.now();const d=Math.floor(t/864e5),h=Math.floor(t%864e5/36e5),mi=Math.floor(t%36e5/6e4);return d>0?'через '+d+' дн '+h+' ч':h>0?'через '+h+' ч '+mi+' мин':'через '+mi+' мин'};
   const curEnd=periodRange(cur).end;const curDue=(hist.find(r=>r.k===cur)||{due:0}).due;const pastDue=due-curDue;
   return `<div class="mebanner">
-      <div class="mb-left">${avatar(me,76,'mb-ava')}
+      <div class="mb-left"><label class="mb-avawrap" title="${me.photo?'Сменить фото':'Загрузить фото'}">${avatar(me,76,'mb-ava')}<span class="mb-cam"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span><input type="file" accept="image/*" id="me-photo" hidden></label>
         <div class="mb-name"><div class="mb-hi">${hi},</div><div class="mb-nm">${esc(me.name)}</div>
           <div class="mb-chips">${(me.roles||[]).filter(r=>r!=='owner').map(r=>`<span>${(ROLES.find(x=>x.id===r)||{}).name}</span>`).join('')}${(me.roles||[]).includes('owner')?'<span>Тренер</span>':''}</div>
-          <div class="mb-sub">${[me.email?'Логин: '+esc(emailToLogin(me.email)):'',(me.cities||[]).map(c=>CITY_NAME[c]).join(', ')].filter(Boolean).join(' · ')}</div></div></div>
+          ${me.photo?'<a href="#" data-act="rmPhoto" class="mb-rm">убрать фото</a>':''}<div class="mb-sub">${[me.email?'Логин: '+esc(emailToLogin(me.email)):'',(me.cities||[]).map(c=>CITY_NAME[c]).join(', ')].filter(Boolean).join(' · ')}</div></div></div>
       <div class="mb-mid">${nextEv?`<div class="mb-lbl">${icon('cal')} Ближайшее</div><div class="mb-ev">${esc(nextEv.type||'Запись')}${nextEv.title?' · '+esc(nextEv.title):''}</div>
           <div class="mb-evs">${WD[(new Date(nextEv.date+'T00:00:00').getDay()+6)%7]}, ${dshow(nextEv.date)}${nextEv.start?' · '+nextEv.start:''}${nextEv.city&&CITY_NAME[nextEv.city]?' · '+CITY_NAME[nextEv.city]:''}</div><div class="mb-cd">${cdown(nextEv)}</div>`
           :`<div class="mb-lbl">${icon('cal')} Ближайшее</div><div class="mb-ev">Записей пока нет</div><div class="mb-evs">Добавьте свободное время — вас предложат в связку</div>`}</div>
