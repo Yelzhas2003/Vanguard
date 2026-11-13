@@ -665,8 +665,9 @@ function kcard(c,s,own,me,showCity){
     ${closedOutcome(c)?(closedOutcome(c)==='good'?'<span style="color:var(--ok);font-weight:600">Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):'')+'</span><br>':'<span style="color:var(--danger);font-weight:600">Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':'')+'</span>'+(c.closed&&(c.closed.reasons||[]).length?'<br>Причина: '+c.closed.reasons.map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', '):'')+'<br>'):''}
     ${c.retake?'<span style="font-weight:600">Пересдача '+(c.retake.kind==='paid'?'платная'+(c.retake.fee?' +'+money(c.retake.fee):''):c.retake.kind==='free'?'бесплатная':c.retake.kind==='expense'?'расходная'+(c.retake.fee?' −'+money(c.retake.fee):''):'')+'</span>'+(c.retake.date?' · '+dshow(c.retake.date)+(c.retake.time?' '+c.retake.time:''):' · дата не выбрана')+'<br>':''}
     ${num(c.refund)?'<span style="color:var(--danger);font-weight:600">Возврат '+money(c.refund)+(c.refundMode==='pct'&&c.refundPct!==''?' ('+c.refundPct+'%)':'')+'</span><br>':''}
-    ${money(r.cost)} · оплачено ${r.pct}%<br>
-    Связка: ${esc(empName(c.techId))} + ${esc(empName(c.teacherId))}${c.address?'<br>Адрес: '+esc(c.address):''}</div>
+    ${money(r.cost)} · ${planOf(c)==='100'?'100%':planOf(c)==='custom'?'оплачено '+r.pct+'%':planOf(c)+' (оплачено '+r.pct+'%)'}<br>
+    Продал: ${esc(empName(c.soldBy))}<br>
+    ${statusById(c.status).id!=='bron'?'Связка: '+esc(empName(c.techId))+' + '+esc(empName(c.teacherId))+(c.address?'<br>Адрес: '+esc(c.address):''):''}</div>
     ${own?`<div class="tot"><span class="small muted">Итого Vanguard</span><b>${money(r.vanguard)}</b></div>`:(mine?`<div class="tot"><span class="small muted">Ваша доля</span><b>${money(mine)}</b></div>`:'')}
   </div>`;
 }
@@ -696,9 +697,14 @@ function clientTable(list,own,me){
 
 /* ===== АНКЕТА КЛИЕНТА ===== */
 let F=null;
+const PAY_PLANS={'100':[100],'50/50':[50,50],'60/40':[60,40],'40/30/30':[40,30,30]};
+function planOf(c){if(c.payPlan&&(PAY_PLANS[c.payPlan]||c.payPlan==='custom'))return c.payPlan;if(c.paidMode==='100'||c.paidMode===undefined)return '100';if(c.paidMode==='50')return '50/50';return 'custom'}
+function partsOf(c){const pl=planOf(c);if(pl==='custom')return [];const n=PAY_PLANS[pl].length;if(Array.isArray(c.payParts)&&c.payParts.length===n)return c.payParts.slice();
+  if(pl==='100')return [true];if(c.paidMode==='50')return [true,false];return PAY_PLANS[pl].map((_,i)=>i===0)}
+function pctFromParts(pl,parts){return PAY_PLANS[pl].reduce((a,p,i)=>a+(parts[i]?p:0),0)}
 function blankClient(city){
-  return {id:null,name:'',exam:'IELTS',examOther:'',city:city||'astana',examDate:'',examTime:'',dateMode:'tbd',slotId:'',level:'',target:'',deadline:'',closed:null,payDate:today(),cost:'',paidMode:'100',paidPct:100,
-    soldBy:'self',teacherId:'',techId:'',status:cfg().statuses[0].id,addon:'none',refund:0,refundMode:'pct',refundPct:'',refundComment:'',retake:null,expense:0,comment:'',rates:{teacher:0,tech:0,sales:0,extras:[]}};
+  return {id:null,name:'',exam:'IELTS',examOther:'',city:city||'astana',examDate:'',examTime:'',dateMode:'tbd',slotId:'',level:'',target:'',deadline:'',closed:null,payDate:today(),cost:'',paidMode:'100',paidPct:100,payPlan:'100',payParts:[true],
+    soldBy:'',teacherId:'',techId:'',status:cfg().statuses[0].id,addon:'none',refund:0,refundMode:'pct',refundPct:'',refundComment:'',retake:null,expense:0,comment:'',rates:{teacher:0,tech:0,sales:0,extras:[]}};
 }
 function openClient(id,copy,presetStatus){
   const src=id?S.clients[id]:null;
@@ -710,6 +716,7 @@ function openClient(id,copy,presetStatus){
   const ss=F.sessionId&&S.sched[F.sessionId]&&!S.sched[F.sessionId].deleted?S.sched[F.sessionId]:null;F.sess=ss?{date:ss.date,start:ss.start,dur:ss.dur,techId:ss.techId,teacherId:ss.teacherId}:null;
   if(F.retake){const rs=F.retake.sessionId&&S.sched[F.retake.sessionId]&&!S.sched[F.retake.sessionId].deleted?S.sched[F.retake.sessionId]:null;F.retake.sess=rs?{date:rs.date,start:rs.start,dur:rs.dur,techId:rs.techId,teacherId:rs.teacherId}:null}
   if(!F.refundMode)F.refundMode='sum';
+  F.payPlan=planOf(F);F.payParts=partsOf(F);if(F.payPlan!=='custom')F.paidPct=pctFromParts(F.payPlan,F.payParts);
   F._orig=src?{teacherId:src.teacherId,techId:src.techId,soldBy:src.soldBy,city:src.city,status:src.status}:null;
   if(copy){F.id=null;F.name=(F.name||'')+' (копия)';F.history=[];F.archived=false;F._orig=null;F._copy=true;F.slotId='';F.sess=null;F.sessionId='';F.dateMode='tbd';F.examDate='';F.examTime='';F.retake=null}
   openModal('<div id="cf"></div>',{cls:'wide',onClose:()=>{F=null}});
@@ -842,15 +849,17 @@ function drawClientForm(){
     <div class="field"><label class="lbl">Город</label>${seg('city',CITIES,c.city)}</div>
     <div class="grid2">
       <div class="field"><label class="lbl">Стоимость, ₸</label><input class="input num" id="c-cost" inputmode="numeric" value="${c.cost===''?'':nfmt(num(c.cost))}" placeholder="210 000" style="font-size:20px"></div>
-      <div class="field"><label class="lbl">Оплачено</label>${seg('paidMode',[{id:'100',name:'100%'},{id:'50',name:'50%'},{id:'other',name:'Другое'}],c.paidMode)}
-        ${c.paidMode==='other'?`<div class="pct" style="margin-top:8px"><input class="input" id="c-paidPct" inputmode="decimal" value="${esc(c.paidPct)}"><span>%</span></div>`:''}</div>
+      <div class="field"><label class="lbl">Условия оплаты</label>${seg('payplan',[{id:'100',name:'100%'},{id:'other',name:'Другое'}],c.payPlan==='100'?'100':'other')}
+        ${c.payPlan!=='100'?`<div style="margin-top:8px">${seg('payplan2',[{id:'50/50',name:'50 / 50'},{id:'60/40',name:'60 / 40'},{id:'40/30/30',name:'40 / 30 / 30'}],c.payPlan)}</div>`:''}
+        ${c.payPlan==='custom'?`<div class="pct" style="margin-top:8px"><span class="small muted">Оплачено</span><input class="input" id="c-paidPct" inputmode="decimal" value="${esc(c.paidPct)}"><span>%</span></div>`
+          :`<div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">${PAY_PLANS[c.payPlan].map((p,i)=>`<label class="check small"><input type="checkbox" data-part="${i}" ${c.payParts[i]?'checked':''}> ${PAY_PLANS[c.payPlan].length>1?(i+1)+'-й платёж '+p+'%':'Оплачено 100%'}${num(c.cost)?' — '+money(Math.round(num(c.cost)*p/100)):''} · оплачено</label>`).join('')}</div>`}</div>
     </div>
-    <div class="grid3">
-      <div class="field"><label class="lbl">Чей клиент (продажа от)</label><select class="select" id="c-soldBy"><option value="self" ${c.soldBy==='self'?'selected':''}>Сами пришли</option>${opt(sellerList(c.city,c.soldBy),c.soldBy)}</select></div>
+    <div class="field"><label class="lbl">Кто продал <span style="color:var(--danger)">*</span></label><select class="select" id="c-soldBy" style="max-width:420px"><option value="" ${!c.soldBy?'selected':''}>— выберите —</option><option value="self" ${c.soldBy==='self'?'selected':''}>Сами пришли</option>${opt(sellerList(c.city,c.soldBy),c.soldBy)}</select></div>
+    ${c.status!=='bron'?`<div class="grid2">
       <div class="field"><label class="lbl">Учитель</label><select class="select" id="c-teacherId">${opt(teacherList(c.city,c.teacherId),c.teacherId,'— не выбран —')}</select></div>
       <div class="field"><label class="lbl">Тех специалист</label><select class="select" id="c-techId">${opt(techList(c.city,c.techId),c.techId,'— не выбран —')}</select></div>
-    </div>
-    ${!teacherList(c.city).length||!techList(c.city).length?`<div class="info">В городе ${esc(CITY_NAME[c.city])} ${!teacherList(c.city).length?'нет активных учителей':''}${!teacherList(c.city).length&&!techList(c.city).length?' и ':''}${!techList(c.city).length?'нет активных тех специалистов':''}. Добавьте их в разделе «Игроки».</div>`:''}
+    </div>`:''}
+    ${c.status!=='bron'&&(!teacherList(c.city).length||!techList(c.city).length)?`<div class="info">В городе ${esc(CITY_NAME[c.city])} ${!teacherList(c.city).length?'нет активных учителей':''}${!teacherList(c.city).length&&!techList(c.city).length?' и ':''}${!techList(c.city).length?'нет активных тех специалистов':''}. Добавьте их в разделе «Игроки».</div>`:''}
     <div class="field"><label class="lbl">Статус</label><div class="seg status" data-seg="status">${st.map(s=>`<button type="button" data-v="${s.id}" class="${c.status===s.id?'on':''}" style="--sc:${s.color}"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</button>`).join('')}</div>
       ${STATUS_HINT[c.status]?`<div class="small muted" style="margin-top:8px">${STATUS_HINT[c.status]}</div>`:''}</div>
     <div class="grid3">
@@ -860,7 +869,7 @@ function drawClientForm(){
     </div>
     ${c.status!=='bron'?`<div class="field" id="dateblock"><label class="lbl">Дата экзамена ${c.status==='process'?'<span style="color:var(--danger)">*</span>':''}</label>${dateBlock('main')}</div>`
       :(c.examDate?`<div class="small muted" style="margin:-6px 0 14px">Назначена дата: ${dshow(c.examDate)} ${esc(c.examTime||'')} — при статусе «Бронь» она сохранится.</div>`:'')}
-    <div class="field"><label class="lbl">Адрес клиента</label><input class="input" id="c-address" value="${esc(c.address||'')}" placeholder="Улица, дом, квартира / ориентир"></div>
+    ${c.status==='process'?`<div class="field"><label class="lbl">Адрес клиента</label><input class="input" id="c-address" value="${esc(c.address||'')}" placeholder="Улица, дом, квартира / ориентир"></div>`:''}
     <div id="statusblock">
     ${c.status==='retake'||rt?`<div class="card" style="margin-bottom:16px;border-color:${statusById('retake').color};padding:16px">
       <div class="row"><b class="grow">Пересдача</b>${c.status!=='retake'?'<button type="button" class="btn sm danger" data-act="dropRetake">Убрать пересдачу</button>':''}</div>
@@ -889,14 +898,14 @@ function drawClientForm(){
     </div>`:''}
     </div>
     <div class="grid2">
-      <div class="field"><label class="lbl">Дата оплаты</label><input type="date" class="input" id="c-payDate" value="${esc(c.payDate||'')}"></div>
-      <div class="field"><label class="lbl">Расходы по клиенту, ₸</label><input class="input num" id="c-expense" inputmode="numeric" value="${nfmt(num(c.expense))}"></div>
+      <div class="field"><label class="lbl">Дата брони</label><input type="date" class="input" id="c-payDate" value="${esc(c.payDate||'')}"></div>
+      ${c.status!=='bron'?`<div class="field"><label class="lbl">Расходы по клиенту, ₸</label><input class="input num" id="c-expense" inputmode="numeric" value="${nfmt(num(c.expense))}"></div>`:'<div></div>'}
     </div>
     <div class="field"><label class="lbl">Комментарий</label><textarea class="input" id="c-comment" rows="2">${esc(c.comment||'')}</textarea></div>
     ${own?`<div class="field"><label class="lbl">Ставки по этому клиенту</label>
       <div class="row">
-        <div class="pct"><span class="small muted">Учитель</span><input class="input" id="r-teacher" inputmode="decimal" value="${c.rates.teacher}">%</div>
-        <div class="pct"><span class="small muted">Тех</span><input class="input" id="r-tech" inputmode="decimal" value="${c.rates.tech}">%</div>
+        ${c.status!=='bron'?`<div class="pct"><span class="small muted">Учитель</span><input class="input" id="r-teacher" inputmode="decimal" value="${c.rates.teacher}">%</div>
+        <div class="pct"><span class="small muted">Тех</span><input class="input" id="r-tech" inputmode="decimal" value="${c.rates.tech}">%</div>`:''}
         <div class="pct"><span class="small muted">Продажа</span><input class="input" id="r-sales" inputmode="decimal" value="${c.rates.sales}" ${c.soldBy==='self'?'disabled':''}>%</div>
       </div>
       ${c.rates.extras.length?`<div class="small" style="margin-top:8px">Доплаты по правилам: ${c.rates.extras.map(x=>esc(empName(x.empId))+' '+x.pct+'%').join(', ')}</div>`:''}
@@ -928,7 +937,7 @@ function drawCalc(){
   const lines=r.shares.map(s=>`<div class="cl"><span>${ROLE_NAME[s.role]} · ${esc(empName(s.empId))} <span class="muted">${s.pct}%</span></span><span>− ${money(s.amount)}</span></div>`).join('');
   const multi=Object.entries(r.byEmp).filter(([id])=>r.shares.filter(s=>s.empId===id).length>1);
   el.innerHTML=`<h4>Расчёт</h4>
-   <div class="cl"><span>Оплачено (${money(r.cost)} × ${r.pct}%)</span><span>${money(r.paid)}</span></div>
+   <div class="cl"><span>Оплачено (${money(r.cost)} × ${r.pct}%${F.payPlan&&F.payPlan!=='100'&&F.payPlan!=='custom'?', план '+F.payPlan:''})</span><span>${money(r.paid)}</span></div>
    ${r.fee?`<div class="cl"><span>Платная пересдача</span><span>+ ${money(r.fee)}</span></div>`:''}
    ${r.refund?`<div class="cl"><span>Возврат</span><span>− ${money(r.refund)}</span></div>`:''}
    <div class="cl"><span><b>Общая выручка</b></span><span>${money(r.revenue)}</span></div>
@@ -949,7 +958,8 @@ function applyRates(which){
 function bindClientForm(box){
   $$('[data-x]',box).forEach(b=>b.onclick=()=>closeModal());
   $$('[data-seg]',box).forEach(g=>g.onclick=e=>{const b=e.target.closest('button');if(!b)return;const k=g.dataset.seg,v=b.dataset.v;
-    if(k==='paidMode'){F.paidMode=v;if(v!=='other')F.paidPct=Number(v);recalcRefund()}
+    if(k==='payplan'){if(v==='100'){F.payPlan='100';F.payParts=[true]}else if(F.payPlan==='100'){F.payPlan='50/50';F.payParts=[true,false]}if(F.payPlan!=='custom')F.paidPct=pctFromParts(F.payPlan,F.payParts);recalcRefund()}
+    else if(k==='payplan2'){F.payPlan=v;F.payParts=PAY_PLANS[v].map((_,i)=>i===0);F.paidPct=pctFromParts(v,F.payParts);recalcRefund()}
     else if(k==='city'){if(F.city===v)return;F.city=v;
       if(F.teacherId&&!teacherList(v).some(e=>e.id===F.teacherId))F.teacherId='';
       if(F.techId&&!techList(v).some(e=>e.id===F.techId))F.techId='';
@@ -981,6 +991,7 @@ function bindClientForm(box){
   moneyIn('c-cost',()=>F.cost,v=>F.cost=v);moneyIn('c-refund',()=>F.refund,v=>F.refund=v);moneyIn('c-expense',()=>F.expense,v=>F.expense=v);
   moneyIn('rt-fee',()=>F.retake.fee,v=>F.retake.fee=v);
   const rp=$('#c-refundPct',box);if(rp)rp.oninput=()=>{F.refundPct=Math.min(100,Math.max(0,num(rp.value)));recalcRefund();drawCalc()};
+  $$('[data-part]',box).forEach(el=>el.onchange=()=>{F.payParts[Number(el.dataset.part)]=el.checked;F.paidPct=pctFromParts(F.payPlan,F.payParts);recalcRefund();drawCalc()});
   const pp=$('#c-paidPct',box);if(pp)pp.oninput=()=>{F.paidPct=Math.min(100,Math.max(0,num(pp.value)));recalcRefund();drawCalc()};
   [['c-teacherId','teacherId','teacher'],['c-techId','techId','tech'],['c-soldBy','soldBy','sales']].forEach(([id,k,role])=>{const el=$('#'+id,box);if(el)el.onchange=()=>{F[k]=el.value;applyRates([role]);drawClientForm()}});
   ['teacher','tech','sales'].forEach(k=>{const el=$('#r-'+k,box);if(el)el.oninput=()=>{F.rates[k]=num(el.value);drawCalc()}});
@@ -992,12 +1003,13 @@ function bindClientForm(box){
   if(act('archClient'))act('archClient').onclick=()=>{const id=F.id;const was=!!S.clients[id].archived;closeModal();archiveClient(id,!was)};
   if(act('delClient'))act('delClient').onclick=async()=>{const id=F.id;if(await ask('Удалить клиента?','Клиент «'+esc(S.clients[id].name)+'» исчезнет с доски и из расчётов, его слоты освободятся. Уже выплаченные суммы не изменятся — в периоде появится корректировка.')){closeModal();deleteClient(id)}};
 }
-const FIELD_LABELS={name:'имя',address:'адрес',level:'уровень',target:'нужный балл',deadline:'дедлайн',exam:'экзамен',city:'город',examDate:'дата экзамена',examTime:'время экзамена',payDate:'дата оплаты',cost:'стоимость',paidPct:'% оплаты',soldBy:'продажа от',teacherId:'учитель',techId:'тех специалист',status:'статус',addon:'пересдача',refund:'возврат',expense:'расходы',comment:'комментарий'};
+const FIELD_LABELS={name:'имя',address:'адрес',level:'уровень',target:'нужный балл',deadline:'дедлайн',exam:'экзамен',city:'город',examDate:'дата экзамена',examTime:'время экзамена',payDate:'дата брони',payPlan:'условия оплаты',cost:'стоимость',paidPct:'% оплаты',soldBy:'продажа от',teacherId:'учитель',techId:'тех специалист',status:'статус',addon:'пересдача',refund:'возврат',expense:'расходы',comment:'комментарий'};
 async function saveClient(){
   const c=F;if(!c)return;
   if(!c.name.trim()){toast('Введите имя клиента');$('#c-name').focus();return}
   if(!num(c.cost)){toast('Введите стоимость');$('#c-cost').focus();return}
   if(c.exam==='Другое'&&!String(c.examOther||'').trim()){toast('Укажите, какой экзамен');return}
+  if(!c.soldBy){toast('Укажите, кто продал');const el=$('#c-soldBy');if(el){el.focus();el.scrollIntoView({block:'center'})}return}
   const need=(cond,msg,id)=>{if(cond){toast(msg);const el=id&&$('#'+id);if(el){el.focus();el.scrollIntoView({block:'center'})}return true}return false};
   if(c.status==='bron'&&(need(!String(c.level||'').trim(),'Укажите уровень клиента','c-level')||need(!String(c.target||'').trim(),'Укажите, сколько баллов нужно','c-target')||need(!c.deadline,'Укажите дедлайн сдачи','c-deadline')))return;
   if(c.status==='process'&&!(c.dateMode==='slot'?c.sess||c.slotId:c.dateMode==='manual'&&c.examDate)){toast('Для «Дата выбрана» выберите дату и время');const el=$('#dateblock');if(el)el.scrollIntoView({block:'center'});return}
@@ -1019,7 +1031,7 @@ async function saveClient(){
     dateMode:rtSess||c.retake.slotId?'slot':(c.retake.date?'manual':'tbd'),slotId:rtSess?'':(c.retake.slotId||''),sessionId:'',date:c.retake.date||'',time:c.retake.time||''}:null;
   const data={name:c.name.trim(),address:String(c.address||'').trim(),exam:c.exam,examOther:c.exam==='Другое'?String(c.examOther||'').trim():'',city:c.city,
     dateMode:c.dateMode,slotId:c.dateMode==='slot'&&!mainSess?(c.slotId||''):'',sessionId:'',examDate:c.dateMode==='tbd'?'':(c.examDate||''),examTime:c.dateMode==='tbd'?'':(c.examTime||''),payDate:c.payDate||'',
-    cost:Math.round(num(c.cost)),paidMode:c.paidMode,paidPct:c.paidMode==='other'?num(c.paidPct):Number(c.paidMode),
+    cost:Math.round(num(c.cost)),payPlan:c.payPlan,payParts:c.payPlan==='custom'?[]:c.payParts,paidMode:c.payPlan==='100'?'100':'other',paidPct:c.payPlan==='custom'?num(c.paidPct):pctFromParts(c.payPlan,c.payParts),
     soldBy:c.soldBy||'self',teacherId:c.teacherId||'',techId:c.techId||'',status:c.status,
     retake:rt,addon:rt?rt.kind:'none',
     refund:Math.round(num(c.refund)),refundMode:c.refundMode||'sum',refundPct:c.refundMode==='pct'?num(c.refundPct):'',refundComment:c.closed&&c.closed.outcome==='bad'?String(c.closed.comment||'').trim():String(c.refundComment||'').trim(),
@@ -1225,7 +1237,7 @@ function viewPayouts(){
     ${own?`<button class="btn sm" data-act="payExport" data-fmt="xlsx">Excel</button><button class="btn sm" data-act="payExport" data-fmt="pdf">PDF</button>
     <button class="btn pri" data-act="payAll" ${rows.some(r=>r.due>0)&&S.canWrite?'':'disabled'}>Отметить всех как выплачено</button>`:''}</div>`;
   if(!own&&!me)return tb+'<div class="card empty"><b>Аккаунт не привязан к игроку</b>Попросите владельца привязать ваш аккаунт в разделе «Игроки», чтобы видеть свои заработки.</div>';
-  if(!rows.length)return tb+'<div class="card empty"><b>В этом периоде начислений нет</b>Начисления появятся, когда у клиентов будет дата '+(cfg().accrual==='payment'?'оплаты':'экзамена')+' в этом периоде.</div>';
+  if(!rows.length)return tb+'<div class="card empty"><b>В этом периоде начислений нет</b>Начисления появятся, когда у клиентов будет дата '+(cfg().accrual==='payment'?'брони':'экзамена')+' в этом периоде.</div>';
   const R=x=>`<td class="r">${nfmt(x)}</td>`;
   const sum=k=>rows.reduce((a,r)=>a+(typeof k==='function'?k(r):r[k]),0);
   const body=rows.map(r=>{const e=emp(r.empId);const open=S.pay.open[r.empId];
@@ -1240,7 +1252,7 @@ function viewPayouts(){
       </td></tr>`:''}`}).join('');
   return tb+`<div class="tablewrap"><table class="t"><thead><tr><th>Игрок</th><th class="r">Как учитель</th><th class="r">Как тех</th><th class="r">За продажи</th><th class="r">Доплаты</th><th class="r">Корректировки</th><th class="r">Итого</th><th class="r">Выплачено</th><th class="r">К выплате</th><th></th></tr></thead>
   <tbody>${body}</tbody><tfoot><tr><td>Итого</td>${R(sum(r=>r.base.byRole.teacher))}${R(sum(r=>r.base.byRole.tech))}${R(sum(r=>r.base.byRole.sales))}${R(sum(r=>r.base.byRole.extra))}${R(sum('corrSum'))}${R(sum('total'))}${R(sum('paid'))}${R(sum('due'))}<td></td></tr></tfoot></table></div>
-  <p class="small muted">Начисление по дате ${cfg().accrual==='payment'?'оплаты':'экзамена'} клиента (меняется в «Настройках»). Нажмите на строку, чтобы увидеть клиентов и корректировки. Если клиента изменили после закрытия периода, разница показывается в «Корректировках», а уже выплаченные суммы не меняются — остаток или переплата видны в «К выплате».</p>`;
+  <p class="small muted">Начисление по дате ${cfg().accrual==='payment'?'брони':'экзамена'} клиента (меняется в «Настройках»). Нажмите на строку, чтобы увидеть клиентов и корректировки. Если клиента изменили после закрытия периода, разница показывается в «Корректировках», а уже выплаченные суммы не меняются — остаток или переплата видны в «К выплате».</p>`;
 }
 function payDialog(empIds,key){
   const L=ledger();const rows=empIds.map(id=>payRow(key,id,L)).filter(r=>r.due>0);
@@ -1446,7 +1458,7 @@ function viewSettings(){
   const used=id=>Object.values(S.clients).some(x=>!x.deleted&&x.status===id);
   return `
   <div class="card"><div class="sectiontitle" style="margin-top:0">Начисление денег игрокам</div>
-    ${seg('accrual',[{id:'exam',name:'По дате экзамена'},{id:'payment',name:'По дате оплаты'}],c.accrual)}
+    ${seg('accrual',[{id:'exam',name:'По дате экзамена'},{id:'payment',name:'По дате брони'}],c.accrual)}
     <p class="small muted">Определяет, в какой 10-дневный период и месяц попадает клиент — в выплатах и в аналитике.</p></div>
 
   <div class="card" style="margin-top:16px"><div class="row"><div class="sectiontitle grow" style="margin:0">Правила-доплаты</div><button class="btn pri" data-act="newRule">+ Правило</button></div>
@@ -1706,7 +1718,8 @@ function openQuickBook(date){
       ${Q.src==='bron'?`<div class="field"><select class="select" id="q-client"><option value="">— выберите клиента из броней —</option>${brons.map(c=>`<option value="${c.id}" ${Q.clientId===c.id?'selected':''}>${esc(c.name)} · ${esc(CITY_NAME[c.city]||'')} · ${esc(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||'')}${c.examDate?' · '+dshow(c.examDate):' · без даты'}</option>`).join('')}</select>
         ${!brons.length?'<div class="small muted" style="margin-top:6px">В брони пока никого нет — выберите «Новый клиент».</div>':''}</div>`
       :`<div class="grid2"><div class="field"><label class="lbl">Имя клиента</label><input class="input" id="q-name" value="${esc(Q.name)}" placeholder="Фамилия Имя"></div>
-        <div class="field"><label class="lbl">Стоимость, ₸</label><input class="input num" id="q-cost" inputmode="numeric" value="${Q.cost===''?'':nfmt(num(Q.cost))}" placeholder="210 000"></div></div>`}
+        <div class="field"><label class="lbl">Стоимость, ₸</label><input class="input num" id="q-cost" inputmode="numeric" value="${Q.cost===''?'':nfmt(num(Q.cost))}" placeholder="210 000"></div></div>
+        <div class="field"><label class="lbl">Кто продал</label><select class="select" id="q-seller"><option value="">— выберите —</option><option value="self" ${Q.soldBy==='self'?'selected':''}>Сами пришли</option>${sellerList(Q.city).map(e=>`<option value="${e.id}" ${Q.soldBy===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select></div>`}
       <div class="field"><label class="lbl">Город</label>${seg('qcity',CITIES,Q.city)}</div>
       <div class="field"><label class="lbl">Экзамен</label>${seg('qexam',EXAMS.map(x=>({id:x,name:x})),Q.exam)}
         ${Q.exam==='Другое'?`<input class="input" id="q-examOther" style="margin-top:8px" placeholder="Какой экзамен?" value="${esc(Q.examOther)}">`:''}</div>
@@ -1726,12 +1739,14 @@ function openQuickBook(date){
     const qc=$('#q-client',box);if(qc)qc.onchange=()=>{Q.clientId=qc.value;const c=S.clients[Q.clientId];
       if(c){Q.city=c.city;Q.exam=c.exam||'IELTS';Q.examOther=c.examOther||'';Q.address=c.address||'';if(c.examDate&&!Q.date)Q.date=c.examDate;if(c.examTime&&!Q.time)Q.time=c.examTime}Q.pair=null;draw()};
     const inp=(id,k,re)=>{const el=$('#'+id,box);if(el)el[re?'onchange':'oninput']=()=>{Q[k]=k==='cost'?el.value.replace(/\D/g,''):el.value;if(re){Q.pair=null;draw()}}};
+    const qs=$('#q-seller',box);if(qs)qs.onchange=()=>{Q.soldBy=qs.value};
     inp('q-name','name');inp('q-cost','cost');inp('q-examOther','examOther');inp('q-address','address');inp('q-date','date',true);inp('q-time','time',true);
     $$('[data-qpair]',box).forEach(b=>b.onclick=()=>{Q.pair=pairs[Number(b.dataset.qpair)];draw()});
     $('[data-save]',box).onclick=async()=>{
       if(Q.src==='bron'&&!Q.clientId){toast('Выберите клиента из броней');return}
       if(Q.src==='new'&&!Q.name.trim()){toast('Введите имя клиента');return}
       if(Q.src==='new'&&!num(Q.cost)){toast('Введите стоимость');return}
+      if(Q.src==='new'&&!Q.soldBy){toast('Укажите, кто продал');return}
       if(!Q.date||!Q.time){toast('Укажите дату и точное время');return}
       if(Q.exam==='Другое'&&!Q.examOther.trim()){toast('Укажите, какой экзамен');return}
       const base=Q.clientId?JSON.parse(JSON.stringify(S.clients[Q.clientId])):blankClient(Q.city);
@@ -1740,7 +1755,8 @@ function openQuickBook(date){
       const ss=F.sessionId&&S.sched[F.sessionId]&&!S.sched[F.sessionId].deleted?S.sched[F.sessionId]:null;
       F.sess=ss?{date:ss.date,start:ss.start,dur:ss.dur,techId:ss.techId,teacherId:ss.teacherId}:null;
       if(F.retake){const rs=F.retake.sessionId&&S.sched[F.retake.sessionId]&&!S.sched[F.retake.sessionId].deleted?S.sched[F.retake.sessionId]:null;F.retake.sess=rs?{date:rs.date,start:rs.start,dur:rs.dur,techId:rs.techId,teacherId:rs.teacherId}:null}
-      if(Q.src==='new'){F.name=Q.name.trim();F.cost=Q.cost}
+      if(Q.src==='new'){F.name=Q.name.trim();F.cost=Q.cost;F.soldBy=Q.soldBy;applyRates(['sales'])}
+      F.payPlan=planOf(F);F.payParts=partsOf(F);if(F.payPlan!=='custom')F.paidPct=pctFromParts(F.payPlan,F.payParts);
       if(F.city!==Q.city){F.city=Q.city;if(F.teacherId&&!teacherList(Q.city).some(e=>e.id===F.teacherId))F.teacherId='';if(F.techId&&!techList(Q.city).some(e=>e.id===F.techId))F.techId='';if(F.soldBy!=='self'&&!sellerList(Q.city).some(e=>e.id===F.soldBy))F.soldBy='self';F.slotId=''}
       F.exam=Q.exam;F.examOther=Q.examOther;F.address=Q.address.trim();F.examDate=Q.date;F.examTime=Q.time;
       F.status='process';
