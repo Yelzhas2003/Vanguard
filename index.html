@@ -36,7 +36,7 @@ button{cursor:pointer}
 a{color:var(--accent);text-decoration:none}
 svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .app{display:flex;min-height:100vh}
-.side{width:200px;flex:none;padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column}
+.side{width:196px;flex:none;padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column}
 .logo{font-weight:700;font-size:17px;letter-spacing:-.01em;padding:4px 10px 18px;display:flex;align-items:center;gap:10px}
 .logo i{width:28px;height:28px;border-radius:7px;background:var(--accent);display:inline-grid;place-items:center;color:var(--card);font-style:normal;font-size:14px;font-weight:800}
 .logo small{display:block;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0}
@@ -125,6 +125,7 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
 .t tfoot td{font-weight:700;border-top:1px solid var(--line2);background:var(--soft)}
 .t tr.sub td{background:var(--soft);font-size:13px;color:var(--text2)}
 /* kpi */
+.btn.ib{padding:0;width:36px;justify-content:center;flex:none}.btn.ib.sm{width:30px}.btn.ib .i{width:17px;height:17px;margin:0}.btn.ib.danger{border-color:var(--line2)!important;background:var(--card)}
 .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:20px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px}
 .kpi .k{font-size:12.5px;color:var(--muted);font-weight:550}
@@ -258,7 +259,9 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
 .logo i.lg{background:transparent!important;box-shadow:none!important;width:34px;height:34px}
 .logo i.lg img{width:30px}
 .logo i.lg{flex:none!important;min-width:34px}
-.side .nav a{color:#B4BFCF;font-size:14px;padding:9px 10px}
+.side .nav a{color:#B4BFCF;font-size:13.5px;padding:8px 8px;gap:9px}
+.side{padding-left:9px!important;padding-right:9px!important}
+.side .logo>div{letter-spacing:.09em!important}
 .side .nav a:hover{background:rgba(255,255,255,.06);color:#fff}
 .side .nav a.on{background:rgba(255,255,255,.09);color:#fff;box-shadow:inset 3px 0 0 #5B8DEF}
 .side .nav .grp{color:#6E7B91}
@@ -282,10 +285,10 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
 .app.mini .side:not(:hover) .nl,.app.mini .side:not(:hover) .grp,.app.mini .side:not(:hover) .logo>div,.app.mini .side:not(:hover) .ver{display:none}
 .app.mini .side:not(:hover) .nav a{justify-content:center;padding:10px 0}
 .app.mini .side:not(:hover) .nav{margin-top:6px}
-.app.mini .side:hover{width:200px;box-shadow:10px 0 34px rgba(0,0,0,.28)}
+.app.mini .side:hover{width:196px;box-shadow:10px 0 34px rgba(0,0,0,.28)}
 .side .nav a,.side .logo{white-space:nowrap}
 .main{transition:margin-left .18s ease}
-@media (min-width:861px){.app.mini:has(.side:hover) .main{margin-left:200px}.app.mini .side:hover{box-shadow:none}}
+@media (min-width:861px){.app.mini:has(.side:hover) .main{margin-left:196px}.app.mini .side:hover{box-shadow:none}}
 :root[data-theme="dark"] .side{background:#F4F6FA!important;border-right:0!important;color:#1A2233;box-shadow:0 0 30px rgba(255,255,255,.08)}
 :root[data-theme="dark"] .side .logo{color:#0E1320}
 :root[data-theme="dark"] .side .logo small{color:#5D687A}
@@ -324,7 +327,7 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 15:30</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 16:00</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -421,6 +424,8 @@ function periodRange(key){
 function nextPeriod(key){let [y,m,p]=key.split('-').map(Number);p++;if(p>3){p=1;m++;if(m>12){m=1;y++}}return y+'-'+pad(m)+'-'+p}
 function prevPeriod(key){let [y,m,p]=key.split('-').map(Number);p--;if(p<1){p=3;m--;if(m<1){m=12;y--}}return y+'-'+pad(m)+'-'+p}
 function periodLabel(key){const [y,m,p]=key.split('-').map(Number);const r=periodRange(key);return Number(r.start.slice(8))+'–'+Number(r.end.slice(8))+' '+MONTHS_GEN[m-1]+' '+y}
+function isClosed(c){return (LEGACY_STATUS[c.status]||c.status)==='closed'}
+function closedDate(c){return (c.closed&&c.closed.date)||c.examDate||(c.updatedAt?String(c.updatedAt).slice(0,10):null)||c.payDate}
 function accrualDate(c,mode){
   const fb=c.createdAt?String(c.createdAt).slice(0,10):null;
   return mode==='payment'?(c.payDate||c.examDate||fb):(c.examDate||c.payDate||fb);
@@ -430,7 +435,8 @@ function buildLedger(clients,mode){
   const L={};
   clients.forEach(c=>{
     if(!c||c.deleted)return;
-    const key=periodKeyOf(accrualDate(c,mode)); if(!key)return;
+    if(!isClosed(c))return;
+    const key=periodKeyOf(closedDate(c)); if(!key)return;
     const r=calcClient(c);
     r.shares.forEach(s=>{
       if(!s.empId||!s.amount)return;
@@ -631,7 +637,9 @@ const KIC={
   cal:'<rect x="3.5" y="5" width="17" height="15.5" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/>',
   smile:'<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4 4 0 0 0 7 0M9 9.5h.01M15 9.5h.01"/>',
   frown:'<circle cx="12" cy="12" r="9"/><path d="M8.5 16a4 4 0 0 1 7 0M9 9.5h.01M15 9.5h.01"/>',
-  check:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>'};
+  check:'<circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/>',
+  trash:'<path d="M4 7h16M10 11v6M14 11v6M5.5 7l1 12a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2l1-12M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7"/>',
+  pencil:'<path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/><path d="m14.5 5.5 3 3"/>'};
 function kpi(ic,label,value,o){o=o||{};
   let d='';if(o.delta!==undefined){const v=o.delta;d=v===null?'<span class="dl dl0">—</span>':v>0?`<span class="dl up">↑ +${v}%</span>`:v<0?`<span class="dl dn">↓ ${v}%</span>`:'<span class="dl dl0">0%</span>'}
   return `<div class="kpi ${o.hero?'hero':''}"><div class="kh">${ic?`<svg class="i" viewBox="0 0 24 24">${KIC[ic]||IC[ic]||''}</svg>`:''}<span>${label}</span></div><div class="kv"><div class="v">${value}</div>${d}</div>${o.sub?`<div class="tiny muted" style="margin-top:2px">${o.sub}</div>`:''}</div>`}
@@ -955,7 +963,7 @@ function setFormStatus(v){
   if(v==='offered'&&!F.offers)F.offers=[];
   if(v==='process'&&F.dateMode==='tbd')F.dateMode='slot';
   if(v==='retake'&&!F.retake)F.retake={kind:'free',fee:'',comment:'',dateMode:'slot',slotId:'',date:'',time:''};
-  if(v==='closed'&&!F.closed)F.closed={outcome:'',score:'',result:'',attempts:F.retake?'2':'1',refundType:'',comment:''};
+  if(v==='closed'&&!F.closed)F.closed={outcome:'',score:'',result:'',attempts:F.retake?'2':'1',refundType:'',comment:'',date:today()};
 }
 function applyRefundFromClosed(){
   const cl=F&&F.closed;if(!cl)return;
@@ -1014,7 +1022,8 @@ function drawClientForm(){
       <div class="field" style="margin-bottom:0"><label class="lbl">Комментарий к пересдаче</label><textarea class="input" id="rt-comment" rows="2">${esc(rt?rt.comment:'')}</textarea></div>
     </div>`:''}
     ${c.status==='closed'&&c.closed?`<div class="card" style="margin-bottom:16px;border-color:${statusById('closed').color};padding:16px">
-      <b>Итог сделки</b>
+      <div class="row"><b class="grow">Итог сделки</b><label class="small muted" style="display:flex;align-items:center;gap:8px">Дата закрытия <input type="date" class="input" id="cl-date" style="width:auto" value="${esc(c.closed.date||today())}"></label></div>
+      <div class="tiny muted" style="margin-top:4px">Игрокам деньги начисляются только после закрытия сделки — в 10-дневный период этой даты.</div>
       <div class="field" style="margin-top:12px"><label class="lbl">Клиент доволен? <span style="color:var(--danger)">*</span></label>${seg('cout',[{id:'good',name:'Доволен — отличный результат'},{id:'bad',name:'Недоволен — возврат'}],c.closed.outcome)}</div>
       ${c.closed.outcome==='good'?`<div class="grid3">
         <div class="field"><label class="lbl">Сколько баллов набрал</label><input class="input" id="cl-score" value="${esc(c.closed.score||'')}" placeholder="напр. 7.0 / 95"></div>
@@ -1056,7 +1065,7 @@ function drawClientForm(){
     <div class="grow"></div>
     ${c.id?`<button class="btn" data-act="dupClient">Дублировать</button>
       <button class="btn" data-act="archClient">${c.archived?'Вернуть из архива':'В архив'}</button>
-      <button class="btn danger" data-act="delClient">Удалить</button>`:''}
+      <button class="btn ib danger" data-act="delClient" title="Удалить" aria-label="Удалить"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button>`:''}
   </div>`;
   if(c.id&&own)resolveNames((c.history||[]).map(h=>h.by));
   drawCalc();
@@ -1121,7 +1130,7 @@ function bindClientForm(box){
   const md=$('#main-date',box);if(md)md.onchange=()=>{F.examDate=md.value};const mt=$('#main-time',box);if(mt)mt.onchange=()=>{F.examTime=mt.value};
   const rd=$('#retake-date',box);if(rd)rd.onchange=()=>{F.retake.date=rd.value};const rtm=$('#retake-time',box);if(rtm)rtm.onchange=()=>{F.retake.time=rtm.value};
   const rc=$('#rt-comment',box);if(rc)rc.oninput=()=>{F.retake.comment=rc.value};
-  [['cl-score','score'],['cl-result','result'],['cl-attempts','attempts'],['cl-comment','comment']].forEach(([id,k])=>{const el=$('#'+id,box);if(el)el.oninput=()=>{F.closed[k]=el.value}});
+  [['cl-date','date'],['cl-score','score'],['cl-result','result'],['cl-attempts','attempts'],['cl-comment','comment']].forEach(([id,k])=>{const el=$('#'+id,box);if(el)el.oninput=()=>{F.closed[k]=el.value}});
   $$('[data-reason]',box).forEach(el=>el.onchange=()=>{const r=new Set(F.closed.reasons||[]);el.checked?r.add(el.dataset.reason):r.delete(el.dataset.reason);F.closed.reasons=[...r]});
   const moneyIn=(id,get,set)=>{const el=$('#'+id,box);if(!el)return;
     el.oninput=()=>{set(el.value.replace(/[^\d]/g,''));if(id!=='c-refund')recalcRefund();drawCalc()};
@@ -1184,7 +1193,7 @@ async function saveClient(){
     level:String(c.level||'').trim(),target:String(c.target||'').trim(),deadline:c.deadline||'',
     offers:[],offerExpires:'',
     closed:c.closed?{outcome:c.closed.outcome||'',score:c.closed.outcome==='good'?String(c.closed.score||'').trim():'',result:c.closed.outcome==='good'?String(c.closed.result||'').trim():'',attempts:c.closed.outcome==='good'?String(c.closed.attempts||'').trim():'',
-      reasons:c.closed.outcome==='bad'?(c.closed.reasons||[]):[],refundType:c.closed.outcome==='bad'?c.closed.refundType:'',comment:String(c.closed.comment||'').trim()}:null,
+      reasons:c.closed.outcome==='bad'?(c.closed.reasons||[]):[],refundType:c.closed.outcome==='bad'?c.closed.refundType:'',comment:String(c.closed.comment||'').trim(),date:c.closed.date||today()}:null,
     rates:{teacher:num(c.rates.teacher),tech:num(c.rates.tech),sales:c.soldBy==='self'?0:num(c.rates.sales),extras:(c.rates.extras||[]).map(x=>({empId:x.empId,pct:num(x.pct),ruleId:x.ruleId||null}))},
     archived:!!(old&&old.archived),deleted:false,
     createdAt:old?old.createdAt:nowIso(),createdBy:old?old.createdBy:(S.uid||''),updatedAt:nowIso(),updatedBy:S.uid||''};
@@ -1256,7 +1265,7 @@ function viewStaff(){
     <div class="row" style="margin:10px 0 6px;gap:6px">${(e.roles||[]).includes('owner')?'<span class="chip acc">Тренер</span>':''}${isRemote(e)?'<span class="chip acc">Учитель удалённо · все города</span>':''}</div>
     <div class="small muted" style="line-height:1.7">${rolesSummary(e)}</div>
     <div class="row" style="margin-top:14px"><div class="grow"><div class="tiny muted">Заработано за всё время</div><div class="num" style="font-size:20px">${money(tot[e.id]||0)}</div></div></div>
-    <div class="row" style="margin-top:12px"><button class="btn sm" data-emp-card="${e.id}">Карточка и выплаты</button><button class="btn sm" data-emp-edit="${e.id}">Изменить</button><button class="btn sm danger" data-emp-del="${e.id}">Удалить</button></div>
+    <div class="row" style="margin-top:12px"><button class="btn sm" data-emp-card="${e.id}">Карточка и выплаты</button><button class="btn ib sm" data-emp-edit="${e.id}" title="Изменить" aria-label="Изменить"><svg class="i" viewBox="0 0 24 24">${KIC.pencil}</svg></button><button class="btn ib sm danger" data-emp-del="${e.id}" title="Удалить" aria-label="Удалить"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button></div>
   </div>`).join('')}</div>`;
 }
 function rolesSummary(e){
@@ -1395,7 +1404,7 @@ function viewPayouts(){
     ${own?`<button class="btn sm" data-act="payExport" data-fmt="xlsx">Excel</button><button class="btn sm" data-act="payExport" data-fmt="pdf">PDF</button>
     <button class="btn pri" data-act="payAll" ${rows.some(r=>r.due>0)&&S.canWrite?'':'disabled'}>Отметить всех как выплачено</button>`:''}</div>`;
   if(!own&&!me)return tb+'<div class="card empty"><b>Аккаунт не привязан к игроку</b>Попросите тренера привязать ваш аккаунт в разделе «Игроки», чтобы видеть свои заработки.</div>';
-  if(!rows.length)return tb+'<div class="card empty"><b>В этом периоде начислений нет</b>Начисления появятся, когда у клиентов будет дата '+(cfg().accrual==='payment'?'брони':'экзамена')+' в этом периоде.</div>';
+  if(!rows.length)return tb+'<div class="card empty"><b>В этом периоде начислений нет</b>Начисления появятся, когда сделки будут закрыты в этом периоде.</div>';
   const R=x=>`<td class="r">${nfmt(x)}</td>`;
   const sum=k=>rows.reduce((a,r)=>a+(typeof k==='function'?k(r):r[k]),0);
   const body=rows.map(r=>{const e=emp(r.empId);const open=S.pay.open[r.empId];
@@ -1410,7 +1419,7 @@ function viewPayouts(){
       </td></tr>`:''}`}).join('');
   return tb+`<div class="tablewrap"><table class="t"><thead><tr><th>Игрок</th><th class="r">Как учитель</th><th class="r">Как тех</th><th class="r">За продажи</th><th class="r">Доплаты</th><th class="r">Корректировки</th><th class="r">Итого</th><th class="r">Выплачено</th><th class="r">К выплате</th><th></th></tr></thead>
   <tbody>${body}</tbody><tfoot><tr><td>Итого</td>${R(sum(r=>r.base.byRole.teacher))}${R(sum(r=>r.base.byRole.tech))}${R(sum(r=>r.base.byRole.sales))}${R(sum(r=>r.base.byRole.extra))}${R(sum('corrSum'))}${R(sum('total'))}${R(sum('paid'))}${R(sum('due'))}<td></td></tr></tfoot></table></div>
-  <p class="small muted">Начисление по дате ${cfg().accrual==='payment'?'брони':'экзамена'} клиента (меняется в «Настройках»). Нажмите на строку, чтобы увидеть клиентов и корректировки. Если клиента изменили после закрытия периода, разница показывается в «Корректировках», а уже выплаченные суммы не меняются — остаток или переплата видны в «К выплате».</p>`;
+  <p class="small muted">Игрокам начисляется только по закрытым сделкам — в период даты закрытия (с учётом возвратов). Нажмите на строку, чтобы увидеть клиентов и корректировки. Если клиента изменили после закрытия периода, разница показывается в «Корректировках», а уже выплаченные суммы не меняются — остаток или переплата видны в «К выплате».</p>`;
 }
 function payDialog(empIds,key){
   const L=ledger();const rows=empIds.map(id=>payRow(key,id,L)).filter(r=>r.due>0);
@@ -1626,7 +1635,7 @@ function openExp(id){
     <div class="field"><label class="lbl">Город</label>${seg('xcity',[...CITIES,{id:'general',name:'Общий'}],x.city)}</div>
     <div class="field"><label class="lbl">Кто заплатил</label><select class="select" id="x-payerId"><option value="">— другое —</option>${liveEmps().map(e=>`<option value="${e.id}" ${x.payerId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select>
     <input class="input" id="x-payer" style="margin-top:8px" placeholder="Или впишите вручную" value="${esc(x.payer||'')}"></div>
-  </div><div class="mf"><button class="btn pri big" data-save ${S.canWrite?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button><div class="grow"></div>${id?'<button class="btn danger" data-del>Удалить</button>':''}</div>`);
+  </div><div class="mf"><button class="btn pri big" data-save ${S.canWrite?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button><div class="grow"></div>${id?'<button class="btn ib danger" data-del title="Удалить" aria-label="Удалить"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button>':''}</div>`);
   $$('[data-x]',m).forEach(b=>b.onclick=()=>closeModal());
   $('[data-seg="xcity"]',m).onclick=e=>{const b=e.target.closest('button');if(!b)return;x.city=b.dataset.v;$$('[data-seg="xcity"] button',m).forEach(z=>z.classList.toggle('on',z===b))};
   $('#x-amount',m).onblur=e=>{e.target.value=nfmt(num(e.target.value.replace(/\D/g,'')))};
@@ -1649,21 +1658,21 @@ function viewSettings(){
   log.sort((a,b)=>String(b.at).localeCompare(a.at));resolveNames([...new Set(log.slice(0,100).map(h=>h.by))]);
   const used=id=>Object.values(S.clients).some(x=>!x.deleted&&x.status===id);
   return `
-  <div class="card"><div class="sectiontitle" style="margin-top:0">Начисление денег игрокам</div>
+  <div class="card"><div class="sectiontitle" style="margin-top:0">Дата клиента в аналитике</div>
     ${seg('accrual',[{id:'exam',name:'По дате экзамена'},{id:'payment',name:'По дате брони'}],c.accrual)}
-    <p class="small muted">Определяет, в какой 10-дневный период и месяц попадает клиент — в выплатах и в аналитике.</p></div>
+    <p class="small muted">Определяет, в какой период клиент попадает в аналитике. Выплаты игрокам всегда считаются только по закрытым сделкам — по дате закрытия.</p></div>
 
   <div class="card" style="margin-top:16px"><div class="row"><div class="sectiontitle grow" style="margin:0">Правила-доплаты</div><button class="btn pri" data-act="newRule">+ Правило</button></div>
     <p class="small muted">«Если учитель (или тех специалист) = X в выбранных городах, то дополнительно Y получает N% от выручки клиента». Подставляется в анкету при выборе игрока и фиксируется при сохранении.</p>
     <div class="list">${c.rules.filter(r=>!r.deleted).map(r=>`<div class="item"><span class="grow">${ruleText(r)}</span>
-      <label class="check small"><input type="checkbox" data-rule-on="${r.id}" ${r.enabled!==false?'checked':''}> вкл</label><button class="btn sm" data-rule-edit="${r.id}">Изменить</button><button class="btn sm danger" data-rule-del="${r.id}">Удалить</button></div>`).join('')||'<div class="muted small">Правил пока нет</div>'}</div></div>
+      <label class="check small"><input type="checkbox" data-rule-on="${r.id}" ${r.enabled!==false?'checked':''}> вкл</label><button class="btn ib sm" data-rule-edit="${r.id}" title="Изменить" aria-label="Изменить"><svg class="i" viewBox="0 0 24 24">${KIC.pencil}</svg></button><button class="btn ib sm danger" data-rule-del="${r.id}" title="Удалить" aria-label="Удалить"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button></div>`).join('')||'<div class="muted small">Правил пока нет</div>'}</div></div>
 
   <div class="card" style="margin-top:16px"><div class="row"><div class="sectiontitle grow" style="margin:0">Статусы</div><button class="btn" data-act="addStatus">+ Статус</button></div>
     <p class="small muted">Цвет карточки = колонка доски. Процесс: Бронь → Дата выбрана → Пересдача → Закрытая сделка.</p>
     <div class="list">${c.statuses.map((s,i)=>`<div class="item"><input type="color" value="${s.color}" data-st-color="${i}" style="width:42px;height:42px;border:0;background:none;padding:0">
       <input class="input" data-st-name="${i}" value="${esc(s.name)}" style="max-width:320px">
       <div class="grow"></div><button class="btn sm" data-st-up="${i}" ${i?'':'disabled'}>↑</button>
-      ${DEFAULT_STATUSES.some(d=>d.id===s.id)||used(s.id)?'':`<button class="btn sm danger" data-st-del="${i}">Удалить</button>`}</div>`).join('')}</div></div>
+      ${DEFAULT_STATUSES.some(d=>d.id===s.id)||used(s.id)?'':`<button class="btn ib sm danger" data-st-del="${i}" title="Удалить" aria-label="Удалить"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button>`}</div>`).join('')}</div></div>
 
   <div class="card" style="margin-top:16px"><div class="sectiontitle" style="margin-top:0">Доступ</div>
     <p class="small" style="margin-top:0">Вход — по логину и паролю. Как добавить игрока:</p>
@@ -1737,8 +1746,13 @@ function viewMe(){
   const freeW=liveSched().filter(w=>w.type==='slot'&&w.playerId===me.id&&!slotOwner(w)&&w.date>=today()&&w.date<=addDays(today(),20)).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
   const freeH=Math.round(freeW.filter(w=>w.date<=addDays(today(),6)).reduce((a,w)=>a+num(w.dur),0)/60);
   const byDay={};freeW.forEach(w=>(byDay[w.date]=byDay[w.date]||[]).push(w));
+  const openMine=allMine.filter(c=>!isClosed(c));
+  const potOf=c=>calcClient({...c,paidPct:100,refund:0}).byEmp[me.id]||0;
+  const lostOf=c=>Math.max(0,(calcClient({...c,refund:0}).byEmp[me.id]||0)-(calcClient(c).byEmp[me.id]||0));
+  const potential=openMine.reduce((a,c)=>a+potOf(c),0);
+  const lostCl=closed.filter(c=>lostOf(c)>0);const lost=lostCl.reduce((a,c)=>a+lostOf(c),0);
   const roleOf=c=>[c.teacherId===me.id?'учитель':'',c.techId===me.id?'тех':'',c.soldBy===me.id?'продажа':'',((c.rates&&c.rates.extras)||[]).some(x=>x.empId===me.id)?'доплата':''].filter(Boolean).join(', ');
-  const KI={'К выплате сейчас':'wallet','Текущий период':'clock','За этот месяц':'cal','Заработано за всё время':'coins','Мои клиенты':'users','Довольные клиенты':'smile','Записей на 2 недели':'cal','Свободно на неделе':'clock'};
+  const KI={'Потенциальный заработок':'trend','Потеряно на возвратах':'undo','К выплате сейчас':'wallet','Текущий период':'clock','За этот месяц':'cal','Заработано за всё время':'coins','Мои клиенты':'users','Довольные клиенты':'smile','Записей на 2 недели':'cal','Свободно на неделе':'clock'};
   const k=(l,v,sub,h)=>kpi(KI[l],l,v,{sub,hero:h});
   const hr=new Date().getHours();const hi=hr<12?'Доброе утро':hr<18?'Добрый день':'Добрый вечер';
   return `<div class="card" style="margin-bottom:16px;padding:22px 24px"><div class="row" style="align-items:flex-start">
@@ -1746,8 +1760,8 @@ function viewMe(){
       <div class="grow"><div class="small muted">${hi},</div><div style="font-size:24px;font-weight:750;letter-spacing:-.01em">${esc(me.name)}</div>
         <div class="row" style="gap:6px;margin-top:8px">${(me.roles||[]).filter(r=>r!=='owner').map(r=>`<span class="chip acc">${(ROLES.find(x=>x.id===r)||{}).name}</span>`).join('')}${(me.roles||[]).includes('owner')?'<span class="chip acc">Тренер</span>':''}</div></div>
       <div class="small muted" style="text-align:right;line-height:1.7">${me.email?'Логин: <b style="color:var(--text)">'+esc(emailToLogin(me.email))+'</b><br>':''}${rolesSummary(me)}</div></div></div>
-    <div class="kpis">${k('К выплате сейчас',money(due),'',true)}${k('Текущий период',money(period),periodLabel(cur))}${k('За этот месяц',money(month),MONTHS[Number(ym.slice(5))-1])}${k('Заработано за всё время',money(earnedAll),'выплачено '+money(paidAll))}</div>
-    <div class="kpis">${k('Мои клиенты',nfmt(allMine.length),'в работе '+inWork+' · закрыто '+closed.length)}${k('Довольные клиенты',sat===null?'—':sat+'%',good+bad?good+' из '+(good+bad)+' закрытых':'пока нет закрытых')}${k('Записей на 2 недели',nfmt(upcoming.length),'экзамены и пересдачи')}${k('Свободно на неделе',freeH+' ч',freeH?'':'добавьте слоты')}</div>
+    <div class="kpis">${k('К выплате сейчас',money(due),'по закрытым сделкам',true)}${k('Потенциальный заработок',money(potential),openMine.length?'сделок в работе: '+openMine.length:'нет открытых сделок')}${k('Заработано за всё время',money(earnedAll),'выплачено '+money(paidAll))}${k('Потеряно на возвратах',lost?'<span style="color:var(--danger)">−'+money(lost)+'</span>':money(0),lostCl.length?'возвратов: '+lostCl.length:'возвратов нет')}</div>
+    <div class="kpis">${k('Текущий период',money(period),periodLabel(cur))}${k('За этот месяц',money(month),MONTHS[Number(ym.slice(5))-1])}${k('Мои клиенты',nfmt(allMine.length),'в работе '+inWork+' · закрыто '+closed.length)}${k('Довольные клиенты',sat===null?'—':sat+'%',good+bad?good+' из '+(good+bad)+' закрытых':'пока нет закрытых')}${k('Записей на 2 недели',nfmt(upcoming.length),'экзамены и пересдачи')}${k('Свободно на неделе',freeH+' ч',freeH?'':'добавьте слоты')}</div>
     <div class="charts" style="grid-template-columns:repeat(auto-fit,minmax(380px,1fr))">
       <div class="chartbox"><div class="row"><h3 class="grow">Моё свободное время</h3><button class="btn sm pri" data-act="myFree">+ Добавить слот</button></div>
         ${freeW.length?`<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto">${Object.entries(byDay).map(([d,ws])=>`<div class="row" style="gap:12px;flex-wrap:nowrap;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;${d===today()?'background:var(--accent-soft)':''}">
@@ -1761,8 +1775,8 @@ function viewMe(){
       <div class="chartbox" style="grid-column:1/-1"><h3>Заработок по периодам</h3><div class="small muted">Последние 9 периодов по 10 дней</div><div class="cv" style="height:220px"><canvas id="ch-me"></canvas></div></div>
     </div>
     <div class="sectiontitle">Мои клиенты (${myClients.length})</div>
-    ${myClients.length?`<div class="tablewrap"><table class="t"><thead><tr><th>Клиент</th><th>Экзамен</th><th>Город</th><th>Дата экзамена</th><th>Статус</th><th>Моя роль</th><th class="r">Моя доля</th></tr></thead><tbody>
-      ${myClients.map(c=>{const s=statusById(c.status);const r=calcClient(c);return `<tr class="click" data-cid="${c.id}"><td><b>${esc(c.name)}</b></td><td>${examLabel(c)}</td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${dshow(c.examDate)}${c.examTime?' '+c.examTime:''}</td><td><span class="chip"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</span></td><td>${roleOf(c)}</td><td class="r"><b>${nfmt(r.byEmp[me.id]||0)}</b></td></tr>`}).join('')}</tbody></table></div>`
+    ${myClients.length?`<div class="tablewrap"><table class="t"><thead><tr><th>Клиент</th><th>Экзамен</th><th>Город</th><th>Дата экзамена</th><th>Статус</th><th>Моя роль</th><th class="r">Моя доля</th><th class="r">Потеряно</th></tr></thead><tbody>
+      ${myClients.map(c=>{const s=statusById(c.status);const r=calcClient(c);return `<tr class="click" data-cid="${c.id}"><td><b>${esc(c.name)}</b></td><td>${examLabel(c)}</td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${dshow(c.examDate)}${c.examTime?' '+c.examTime:''}</td><td><span class="chip"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</span></td><td>${roleOf(c)}</td><td class="r">${isClosed(c)?'<b>'+nfmt(r.byEmp[me.id]||0)+'</b>':'<span class="muted" title="Потенциально — начислится после закрытия">≈ '+nfmt(potOf(c))+'</span>'}</td><td class="r">${lostOf(c)?'<span style="color:var(--danger)">−'+nfmt(lostOf(c))+'</span>':'—'}</td></tr>`}).join('')}</tbody></table></div>`
       :'<div class="card empty"><b>Пока нет клиентов</b>Клиенты появятся здесь, когда вас укажут в анкете.</div>'}`;
 }
 function drawMe(){
@@ -1889,7 +1903,7 @@ function openSlot(id){
     <div class="kpis" style="grid-template-columns:1fr 1fr;margin-bottom:12px"><div class="kpi"><div class="k">Когда</div><div class="v" style="font-size:18px">${WD[(new Date(s.date+'T00:00:00').getDay()+6)%7]}, ${dshow(s.date)}<br>${s.start}–${fromMin(b)}</div></div>
     <div class="kpi"><div class="k">Кто</div><div class="v" style="font-size:18px">${esc(empName(s.playerId))}<br><span class="small muted">${esc(whereText(emp(s.playerId)))}</span></div></div></div>
     ${inside.length?`<div class="small"><b>Записи в это время:</b>${inside.map(x=>`<div style="padding:4px 0">${x.start}–${fromMin(toMin(x.start)+num(x.dur))} · ${esc(S.clients[x.clientId].name)} · ${esc(pairName(x))}</div>`).join('')}</div>`:'<div class="small muted">Записей пока нет. Клиента записывают через анкету: «Дата экзамена» → «По связкам».</div>'}
-  </div><div class="mf"><button class="btn" data-x>Закрыть</button><div class="grow"></div>${canEdit?'<button class="btn danger" data-del>Удалить это окно</button>':''}</div>`,{cls:'narrow'});
+  </div><div class="mf"><button class="btn" data-x>Закрыть</button><div class="grow"></div>${canEdit?'<button class="btn ib danger" data-del title="Удалить это окно" aria-label="Удалить это окно"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button>':''}</div>`,{cls:'narrow'});
   $$('[data-x]',m).forEach(b=>b.onclick=()=>closeModal());
   const d=m.querySelector('[data-del]');if(d)d.onclick=async()=>{
     if(inside.length&&!await ask('Удалить окно?','В это время уже есть записи ('+inside.length+'). Они останутся, но новых в этом окне не будет.','Удалить'))return;
@@ -2058,7 +2072,7 @@ function drawEvent(){
       ${x.repeat?`<div class="row" style="margin-top:8px"><span class="small muted">до</span><input type="date" class="input" id="ev-until" value="${esc(x.until)}" style="width:auto"><span class="tiny muted">не больше 26 недель</span></div>`:''}</div>`
       :(x.seriesId?'<div class="info">Это занятие из повторяющейся серии. Изменения применяются только к нему.</div>':'')}
     <div class="field"><label class="lbl">Комментарий</label><textarea class="input" id="ev-comment" rows="2">${esc(x.comment||'')}</textarea></div>
-  </div><div class="mf"><button class="btn pri big" data-save ${S.canWrite?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button><div class="grow"></div>${x.id?'<button class="btn danger" data-del>Удалить</button>':''}</div>`;
+  </div><div class="mf"><button class="btn pri big" data-save ${S.canWrite?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button><div class="grow"></div>${x.id?'<button class="btn ib danger" data-del title="Удалить" aria-label="Удалить"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button>':''}</div>`;
   $$('[data-x]',box).forEach(b=>b.onclick=()=>closeModal());
   const segc=(k,fn)=>{const g=$(`[data-seg="${k}"]`,box);if(g)g.onclick=e=>{const b=e.target.closest('button');if(b){fn(b.dataset.v);drawEvent()}}};
   segc('etype',v=>x.type=v);segc('edur',v=>x.dur=Number(v));
