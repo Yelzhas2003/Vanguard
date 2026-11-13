@@ -336,7 +336,7 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 16:40</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 16:55</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -384,7 +384,7 @@ function calcClient(c){
   const paid=Math.round(cost*pct/100);
   const fee=c.retake&&c.retake.kind==='paid'?Math.round(num(c.retake.fee)):0;
   const refund=Math.round(num(c.refund));
-  const split=fee>0&&c.retake.tPct!==undefined&&c.retake.tPct!==null&&c.retake.tPct!=='';
+  const split=fee>0&&('tPct' in c.retake);
   const revenue=Math.max(0,paid+fee-refund);
   const baseRev=split?Math.max(0,paid-refund):revenue;
   const r=c.rates||{};
@@ -436,7 +436,6 @@ function periodRange(key){
 function nextPeriod(key){let [y,m,p]=key.split('-').map(Number);p++;if(p>3){p=1;m++;if(m>12){m=1;y++}}return y+'-'+pad(m)+'-'+p}
 function prevPeriod(key){let [y,m,p]=key.split('-').map(Number);p--;if(p<1){p=3;m--;if(m<1){m=12;y--}}return y+'-'+pad(m)+'-'+p}
 function periodLabel(key){const [y,m,p]=key.split('-').map(Number);const r=periodRange(key);return Number(r.start.slice(8))+'–'+Number(r.end.slice(8))+' '+MONTHS_GEN[m-1]+' '+y}
-function rtDefault(city){const d=(cfg().retakeSplit||{})[city]||{};return {t:d.t===undefined?50:num(d.t),h:d.h===undefined?0:num(d.h)}}
 function isClosed(c){return (LEGACY_STATUS[c.status]||c.status)==='closed'}
 function closedDate(c){return (c.closed&&c.closed.date)||c.examDate||(c.updatedAt?String(c.updatedAt).slice(0,10):null)||c.payDate}
 function accrualDate(c,mode){
@@ -1030,12 +1029,14 @@ function drawClientForm(){
       <div class="row"><b class="grow">Пересдача</b>${c.status!=='retake'?'<button type="button" class="btn sm danger" data-act="dropRetake">Убрать пересдачу</button>':''}</div>
       <div class="field" style="margin-top:10px">${seg('rkind',[{id:'free',name:'Бесплатная'},{id:'paid',name:'Платная'},{id:'expense',name:'Расходная (платим мы)'}],rt?(rt.kind==='other'?'':rt.kind):'free')}</div>
       ${rt&&rt.kind==='paid'?`<div class="field"><label class="lbl">Клиент доплачивает, ₸ <span class="muted">(добавится к выручке)</span></label><input class="input num" id="rt-fee" inputmode="numeric" value="${rt.fee===''?'':nfmt(num(rt.fee))}" style="max-width:240px"></div>
-        ${(()=>{const fee=num(rt.fee);if(rt.tPct===undefined){const d=rtDefault(c.city);rt.tPct=d.t;rt.hPct=d.h}const t=num(rt.tPct),h=num(rt.hPct),v=100-t-h;const amt=p=>fee?' · '+money(Math.round(fee*p/100)):'';
-          return `<div class="field"><label class="lbl">Как делим платную пересдачу</label><div class="row" style="gap:14px;align-items:center">
-            <label class="small" style="display:flex;align-items:center;gap:6px">Учителю <input class="input num" id="rt-t" inputmode="numeric" value="${t}" style="width:70px;min-height:34px;padding:5px 8px"> %<span class="muted">${amt(t)}</span></label>
-            <label class="small" style="display:flex;align-items:center;gap:6px">Тех специалисту <input class="input num" id="rt-h" inputmode="numeric" value="${h}" style="width:70px;min-height:34px;padding:5px 8px"> %<span class="muted">${amt(h)}</span></label>
-            <span class="small" style="${v<0?'color:var(--danger)':''}"><b>Vanguard (чистыми): ${v}%</b><span class="muted">${amt(Math.max(0,v))}</span></span></div>
-            <div class="tiny muted" style="margin-top:4px">По умолчанию для города берётся из «Настроек». Доли идут учителю и тех специалисту этого клиента.</div></div>`})()}`:''}
+        ${(()=>{const fee=num(rt.fee);if(!('tPct' in rt)){rt.tPct='';rt.hPct='';rt.vPct=''}const amt=p=>fee&&p!==''?' · '+money(Math.round(fee*num(p)/100)):'';
+          const sum=num(rt.tPct)+num(rt.hPct)+num(rt.vPct);const filled=rt.tPct!==''||rt.hPct!==''||rt.vPct!=='';
+          const inp=(id,v)=>`<input class="input num" id="${id}" inputmode="numeric" value="${v}" placeholder="0" style="width:70px;min-height:34px;padding:5px 8px">`;
+          return `<div class="field"><label class="lbl">Как делим платную пересдачу <span style="color:var(--danger)">*</span></label><div class="row" style="gap:14px;align-items:center">
+            <label class="small" style="display:flex;align-items:center;gap:6px">Учителю ${inp('rt-t',rt.tPct)} %<span class="muted" id="rt-ta">${amt(rt.tPct)}</span></label>
+            <label class="small" style="display:flex;align-items:center;gap:6px">Тех специалисту ${inp('rt-h',rt.hPct)} %<span class="muted" id="rt-ha">${amt(rt.hPct)}</span></label>
+            <label class="small" style="display:flex;align-items:center;gap:6px"><b>Vanguard (чистыми)</b> ${inp('rt-v',rt.vPct)} %<span class="muted" id="rt-va">${amt(rt.vPct)}</span></label></div>
+            <div class="tiny" id="rt-sum" style="margin-top:4px;${filled&&sum!==100?'color:var(--danger)':'color:var(--muted)'}">Всего: ${sum}%${sum!==100?' — должно быть ровно 100%':' ✓'}. Заполняется вручную для каждого клиента.</div></div>`})()}`:''}
       ${rt&&rt.kind==='expense'?`<div class="field"><label class="lbl">Стоимость экзамена за наш счёт, ₸ <span class="muted">(уйдёт в расходы по клиенту)</span></label><input class="input num" id="rt-fee" inputmode="numeric" value="${rt.fee===''?'':nfmt(num(rt.fee))}" style="max-width:240px"></div>`:''}
       <div class="field"><label class="lbl">Дата пересдачи</label>${dateBlock('retake')}</div>
       <div class="field" style="margin-bottom:0"><label class="lbl">Комментарий к пересдаче</label><textarea class="input" id="rt-comment" rows="2">${esc(rt?rt.comment:'')}</textarea></div>
@@ -1091,6 +1092,10 @@ function drawClientForm(){
   const nsc=box.closest('.modal').querySelector('.mb');if(nsc)nsc.scrollTop=top;
   bindClientForm(box);
 }
+function rtSplitInfo(){const rt=F&&F.retake;if(!rt||!$('#rt-sum'))return;const fee=num(rt.fee);const amt=p=>fee&&p!==''?' · '+money(Math.round(fee*num(p)/100)):'';
+  $('#rt-ta').textContent=amt(rt.tPct);$('#rt-ha').textContent=amt(rt.hPct);$('#rt-va').textContent=amt(rt.vPct);
+  const sum=num(rt.tPct)+num(rt.hPct)+num(rt.vPct);const filled=rt.tPct!==''||rt.hPct!==''||rt.vPct!=='';const el=$('#rt-sum');
+  el.textContent='Всего: '+sum+'%'+(sum!==100?' — должно быть ровно 100%':' ✓')+'. Заполняется вручную для каждого клиента.';el.style.color=filled&&sum!==100?'var(--danger)':'var(--muted)'}
 function drawCalc(){
   const el=$('#calcbox');if(!el||!F)return;
   const r=calcClient(F);const own=isOwner();const me=myEmp();
@@ -1104,6 +1109,7 @@ function drawCalc(){
    ${r.refund?`<div class="cl"><span>Возврат</span><span>− ${money(r.refund)}</span></div>`:''}
    <div class="cl"><span><b>Общая выручка</b></span><span>${money(r.revenue)}</span></div>
    ${lines}
+   ${r.split?`<div class="cl"><span>Пересдача — Vanguard <span class="muted">${num(F.retake.vPct)}% от ${money(r.fee)}</span></span><span>${money(Math.round(r.fee*num(F.retake.vPct)/100))}</span></div>`:''}
    ${multi.map(([id,v])=>`<div class="cl small muted"><span>${esc(empName(id))} всего (несколько ролей)</span><span>${money(v)}</span></div>`).join('')}
    ${r.expense-r.rexp?`<div class="cl"><span>Расходы по клиенту</span><span>− ${money(r.expense-r.rexp)}</span></div>`:''}
    ${r.rexp?`<div class="cl"><span>Расходная пересдача (за наш счёт)</span><span>− ${money(r.rexp)}</span></div>`:''}
@@ -1132,7 +1138,7 @@ function bindClientForm(box){
     else if(k==='status')setFormStatus(v);
     else if(k==='dmode'){F.dateMode=v;if(v!=='slot'){F.slotId='';F.sess=null}if(v==='tbd'){F.examDate='';F.examTime=''}}
     else if(k==='rdmode'){F.retake.dateMode=v;if(v!=='slot'){F.retake.slotId='';F.retake.sess=null}if(v==='tbd'){F.retake.date='';F.retake.time=''}}
-    else if(k==='rkind'){F.retake.kind=v;F.retake.fee='';if(v==='paid'){const d=rtDefault(F.city);F.retake.tPct=d.t;F.retake.hPct=d.h}recalcRefund()}
+    else if(k==='rkind'){F.retake.kind=v;F.retake.fee='';if(v==='paid'){F.retake.tPct='';F.retake.hPct='';F.retake.vPct=''}recalcRefund()}
     else if(k==='cout'){F.closed.outcome=v;if(v==='bad'&&!F.closed.refundType)F.closed.refundType='partial';if(v==='bad'&&F.closed.refundType==='partial'&&F.refundMode!=='sum'){F.refundMode='pct'}applyRefundFromClosed()}
     else if(k==='crefund'){F.closed.refundType=v;if(v==='partial'){F.refundMode=F.refundMode||'pct';if(F.refundPct===100)F.refundPct=''}applyRefundFromClosed()}
     else if(k==='refmode'){F.refundMode=v;if(v==='pct'){if(F.refundPct==='')F.refundPct=gross(F)?Math.round(num(F.refund)/gross(F)*100):100;recalcRefund()}}
@@ -1156,8 +1162,8 @@ function bindClientForm(box){
     el.onblur=()=>{if(el.value!=='')el.value=nfmt(num(get()))};el.onfocus=()=>el.select()};
   moneyIn('c-cost',()=>F.cost,v=>F.cost=v);moneyIn('c-refund',()=>F.refund,v=>F.refund=v);moneyIn('c-expense',()=>F.expense,v=>F.expense=v);
   moneyIn('rt-fee',()=>F.retake.fee,v=>F.retake.fee=v);
-  {const f=$('#rt-fee',box);if(f&&F.retake&&F.retake.kind==='paid')f.onchange=()=>drawClientForm()}
-  [['rt-t','tPct'],['rt-h','hPct']].forEach(([id,k])=>{const el=$('#'+id,box);if(!el)return;el.oninput=()=>{F.retake[k]=Math.min(100,Math.max(0,num(el.value.replace(/[^\d.]/g,''))));drawCalc()};el.onchange=()=>drawClientForm()});
+  {const f=$('#rt-fee',box);if(f&&F.retake&&F.retake.kind==='paid')f.addEventListener('input',()=>rtSplitInfo())}
+  [['rt-t','tPct'],['rt-h','hPct'],['rt-v','vPct']].forEach(([id,k])=>{const el=$('#'+id,box);if(!el)return;el.oninput=()=>{const t=el.value.replace(/[^\d.]/g,'');F.retake[k]=t===''?'':Math.min(100,Math.max(0,num(t)));drawCalc();rtSplitInfo()}});
   const rp=$('#c-refundPct',box);if(rp)rp.oninput=()=>{F.refundPct=Math.min(100,Math.max(0,num(rp.value)));recalcRefund();drawCalc()};
   $$('[data-part]',box).forEach(el=>el.onchange=()=>{F.payParts[Number(el.dataset.part)]=el.checked;F.paidPct=pctFromParts(F.payPlan,F.payParts);recalcRefund();drawCalc()});
   const pp=$('#c-paidPct',box);if(pp)pp.oninput=()=>{F.paidPct=Math.min(100,Math.max(0,num(pp.value)));recalcRefund();drawCalc()};
@@ -1189,7 +1195,7 @@ async function saveClient(){
       const a=toMin(o.start),b=a+num(o.dur);if(!keep&&!(freeAt(o.techId,c.city,o.date,a,b,c.id||'_new')&&freeAt(o.teacherId,c.city,o.date,a,b,c.id||'_new'))){toast('Вариант '+optLabel(o)+' уже занят — уберите его');return}}}
   if(c.status==='process'&&!(c.dateMode==='slot'?c.sess||c.slotId:c.dateMode==='manual'&&c.examDate)){toast('Для «Дата утверждена» выберите дату и время');const el=$('#dateblock');if(el)el.scrollIntoView({block:'center'});return}
   if(c.status==='retake'&&(!c.retake||!['paid','free','expense'].includes(c.retake.kind))){toast('Выберите вид пересдачи');return}
-  if(c.retake&&c.retake.kind==='paid'&&num(c.retake.tPct)+num(c.retake.hPct)>100){toast('Доли пересдачи больше 100%');return}
+  if(c.retake&&c.retake.kind==='paid'&&num(c.retake.fee)&&('tPct' in c.retake)&&num(c.retake.tPct)+num(c.retake.hPct)+num(c.retake.vPct)!==100){toast('Платная пересдача: учитель + тех + Vanguard должно быть 100%');$('#rt-t')&&$('#rt-t').focus();return}
   if(c.retake&&c.retake.kind==='expense'&&!num(c.retake.fee)){toast('Укажите стоимость расходной пересдачи');$('#rt-fee')&&$('#rt-fee').focus();return}
   if(c.status==='closed'){const cl=c.closed||{};
     if(!cl.outcome){toast('Отметьте: клиент доволен или нужен возврат');return}
@@ -1203,7 +1209,7 @@ async function saveClient(){
   if(c.retake&&c.retake.dateMode==='slot'&&!chk(c.retake.sess,old&&old.retake&&old.retake.sessionId)){toast('Время пересдачи у связки уже занято — выберите другое');F.retake.sess=null;drawClientForm();return}
   if(c.sess&&c.retake&&c.retake.sess&&sameOpt(c.sess,c.retake.sess)){toast('Для пересдачи выберите другое время');return}
   const mainSess=c.dateMode==='slot'?c.sess:null;const rtSess=c.retake&&c.retake.dateMode==='slot'?c.retake.sess:null;
-  const rt=c.retake?{kind:c.retake.kind||'free',fee:(c.retake.kind==='paid'||c.retake.kind==='expense')?Math.round(num(c.retake.fee)):0,...(c.retake.kind==='paid'?{tPct:num(c.retake.tPct),hPct:num(c.retake.hPct)}:{}),comment:String(c.retake.comment||'').trim(),
+  const rt=c.retake?{kind:c.retake.kind||'free',fee:(c.retake.kind==='paid'||c.retake.kind==='expense')?Math.round(num(c.retake.fee)):0,...(c.retake.kind==='paid'&&('tPct' in c.retake)?{tPct:num(c.retake.tPct),hPct:num(c.retake.hPct),vPct:num(c.retake.vPct)}:{}),comment:String(c.retake.comment||'').trim(),
     dateMode:rtSess||c.retake.slotId?'slot':(c.retake.date?'manual':'tbd'),slotId:rtSess?'':(c.retake.slotId||''),sessionId:'',date:c.retake.date||'',time:c.retake.time||''}:null;
   const data={name:c.name.trim(),address:String(c.address||'').trim(),exam:c.exam,examOther:c.exam==='Другое'?String(c.examOther||'').trim():'',city:c.city,
     dateMode:c.dateMode,slotId:c.dateMode==='slot'&&!mainSess?(c.slotId||''):'',sessionId:'',examDate:c.dateMode==='tbd'?'':(c.examDate||''),examTime:c.dateMode==='tbd'?'':(c.examTime||''),payDate:c.payDate||'',
@@ -1673,10 +1679,6 @@ function openExp(id){
 
 /* ===== НАСТРОЙКИ ===== */
 function saveConfig(patch){const c={...cfg(),...patch};return setDoc(BASE+'/config/app',{statuses:c.statuses,statusesV:4,accrual:c.accrual,rules:c.rules,sessionMin:c.sessionMin,retakeSplit:c.retakeSplit||{},updatedAt:nowIso()})}
-document.addEventListener('change',e=>{const el=e.target.closest&&e.target.closest('[data-rts]');if(!el||!isOwner())return;const [city,k]=el.dataset.rts.split('|');
-  const rs=JSON.parse(JSON.stringify(cfg().retakeSplit||{}));const d=rtDefault(city);rs[city]={t:d.t,h:d.h};rs[city][k]=Math.min(100,Math.max(0,num(el.value)));
-  if(rs[city].t+rs[city].h>100){toast('Сумма долей больше 100%');render();return}
-  saveConfig({retakeSplit:rs}).then(()=>toast('Сохранено'))});
 function viewSettings(){
   const c=cfg();
   const viewers=Object.keys(S.viewers);resolveNames(viewers);
@@ -1688,12 +1690,6 @@ function viewSettings(){
     ${seg('accrual',[{id:'exam',name:'По дате экзамена'},{id:'payment',name:'По дате брони'}],c.accrual)}
     <p class="small muted">Определяет, в какой период клиент попадает в аналитике. Выплаты игрокам всегда считаются только по закрытым сделкам — по дате закрытия.</p></div>
 
-  <div class="card" style="margin-top:16px"><div class="sectiontitle" style="margin-top:0">Платная пересдача — как делим</div>
-    <p class="small muted">Доли от суммы платной пересдачи по умолчанию. В анкете клиента их можно поменять. Остаток — Vanguard (чистыми).</p>
-    <div class="list">${CITIES.map(ct=>{const d=rtDefault(ct.id);return `<div class="item"><b style="width:90px">${ct.name}</b>
-      <label class="small" style="display:flex;align-items:center;gap:6px">Учителю <input class="input num" data-rts="${ct.id}|t" value="${d.t}" style="width:64px;min-height:32px;padding:4px 8px"> %</label>
-      <label class="small" style="display:flex;align-items:center;gap:6px">Тех специалисту <input class="input num" data-rts="${ct.id}|h" value="${d.h}" style="width:64px;min-height:32px;padding:4px 8px"> %</label>
-      <span class="small"><b>Vanguard: ${100-d.t-d.h}%</b></span></div>`}).join('')}</div></div>
   <div class="card" style="margin-top:16px"><div class="row"><div class="sectiontitle grow" style="margin:0">Правила-доплаты</div><button class="btn pri" data-act="newRule">+ Правило</button></div>
     <p class="small muted">«Если учитель (или тех специалист) = X в выбранных городах, то дополнительно Y получает N% от выручки клиента». Подставляется в анкету при выборе игрока и фиксируется при сохранении.</p>
     <div class="list">${c.rules.filter(r=>!r.deleted).map(r=>`<div class="item"><span class="grow">${ruleText(r)}</span>
