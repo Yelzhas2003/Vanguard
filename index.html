@@ -259,7 +259,7 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
   <aside class="side" id="side">
     <div class="logo"><i>V</i><div>Vanguard<small>CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 13:05</div>
+    <div class="tiny muted" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 13:10</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -287,8 +287,8 @@ const DEFAULT_RATES={astana:{teacher:10,tech:20,sales:10},almaty:{teacher:25,tec
 const RATE_HINTS={astana:{teacher:'обычно 10%',tech:'20% (или 10% для второго тех специалиста)'},almaty:{teacher:'25% (или 10%)',tech:'обычно 25%'},shymkent:{teacher:'обычно 10%',tech:'обычно 25%'}};
 const DEFAULT_STATUSES=[
   {id:'bron',name:'Бронь',color:'#7DCB8E'},
-  {id:'offered',name:'Дата предложена',color:'#F08C2E'},
-  {id:'process',name:'Дата утверждена',color:'#E9B949'},
+  {id:'offered',name:'Дата предложена',color:'#E9B949'},
+  {id:'process',name:'Дата утверждена',color:'#2F6FE4'},
   {id:'retake',name:'Пересдача',color:'#A08CD8'},
   {id:'closed',name:'Закрытая сделка',color:'#0F766E'}];
 const LEGACY_STATUS={excellent:'closed',refund:'closed'};
@@ -473,7 +473,7 @@ const S={db:null,user:null,uid:null,ownerAcc:false,canWrite:true,route:'',
   an:{city:'all',mode:'month',period:'',month:'',from:'',to:'',series:'decade'},
   pay:{period:'',open:{}},exp:{month:'',city:''},staff:{show:'active'},charts:[]};
 
-function cfg(){const c=S.config||{};return {statuses:(c.statusesV===3&&c.statuses&&c.statuses.length)?c.statuses:DEFAULT_STATUSES,accrual:c.accrual||'exam',rules:c.rules||[],sessionMin:300}}
+function cfg(){const c=S.config||{};return {statuses:(c.statusesV===4&&c.statuses&&c.statuses.length)?c.statuses:DEFAULT_STATUSES,accrual:c.accrual||'exam',rules:c.rules||[],sessionMin:300}}
 function statusById(id){const st=cfg().statuses;id=LEGACY_STATUS[id]||id;return st.find(s=>s.id===id)||st[0]}
 function closedOutcome(c){if(c.closed&&c.closed.outcome)return c.closed.outcome;if(c.status==='excellent')return 'good';if(c.status==='refund')return 'bad';return ''}
 function emp(id){return S.emps[id]}
@@ -667,7 +667,7 @@ function kcard(c,s,own,me,showCity){
     ${c.level||c.target||c.deadline?'Уровень '+esc(c.level||'—')+' → '+esc(c.target||'—')+(c.deadline?' · дедлайн '+dshow(c.deadline):'')+'<br>':''}
     ${closedOutcome(c)?(closedOutcome(c)==='good'?'<span style="color:var(--ok);font-weight:600">Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):'')+'</span><br>':'<span style="color:var(--danger);font-weight:600">Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':'')+'</span>'+(c.closed&&(c.closed.reasons||[]).length?'<br>Причина: '+c.closed.reasons.map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', '):'')+'<br>'):''}
     ${c.retake?'<span style="font-weight:600">Пересдача '+(c.retake.kind==='paid'?'платная'+(c.retake.fee?' +'+money(c.retake.fee):''):c.retake.kind==='free'?'бесплатная':c.retake.kind==='expense'?'расходная'+(c.retake.fee?' −'+money(c.retake.fee):''):'')+'</span>'+(c.retake.date?' · '+dshow(c.retake.date)+(c.retake.time?' '+c.retake.time:''):' · дата не выбрана')+'<br>':''}
-    ${statusById(c.status).id==='offered'?(offerExpired(c)?'<span style="color:var(--danger);font-weight:600">Время истекло — вернётся в бронь</span><br>':'<span style="color:'+OFFER_COLOR+';font-weight:600">Предложено вариантов: '+(c.offers||[]).length+' · до '+holdLabel(c.offerExpires)+'</span><br>'):''}
+    ${statusById(c.status).id==='offered'?(offerExpired(c)?'<span style="color:var(--danger);font-weight:600">Время истекло — вернётся в бронь</span><br>':'<span style="color:var(--warn);font-weight:600">Предложено вариантов: '+(c.offers||[]).length+' · до '+holdLabel(c.offerExpires)+'</span><br>'):''}
     ${c.offerExpiredAt&&statusById(c.status).id==='bron'?'<span class="muted">Не подтвердил предложенную дату</span><br>':''}
     ${num(c.refund)?'<span style="color:var(--danger);font-weight:600">Возврат '+money(c.refund)+(c.refundMode==='pct'&&c.refundPct!==''?' ('+c.refundPct+'%)':'')+'</span><br>':''}
     ${money(r.cost)} · ${planOf(c)==='100'?'оплата 100%':planOf(c)==='custom'?'оплачено '+r.pct+'%':'оплата '+planOf(c)}<br>
@@ -748,7 +748,7 @@ function seg(name,opts,val){return `<div class="seg" data-seg="${name}">${opts.m
 /* ---- связки: учитель + тех специалист ---- */
 function slotOwner(s){return s&&s.clientId&&S.clients[s.clientId]&&!S.clients[s.clientId].deleted?s.clientId:''}
 function partIds(x){return x.type==='session'?[x.techId,x.teacherId]:[x.playerId]}
-const HOLD_HOURS=12,OFFER_COLOR='#F08C2E';
+const HOLD_HOURS=12,OFFER_COLOR='#E0A400';
 function sessLive(x){if(!(x&&!x.deleted&&x.type==='session'&&x.clientId&&S.clients[x.clientId]&&!S.clients[x.clientId].deleted))return false;
   if(x.bookKind==='offer'){const c=S.clients[x.clientId];return !!x.expiresAt&&x.expiresAt>nowIso()&&statusById(c.status).id==='offered'}return true}
 function holdLabel(iso){if(!iso)return '';const d=new Date(iso);return pad(d.getHours())+':'+pad(d.getMinutes())+(isoOf(d)===today()?' сегодня':isoOf(d)===addDays(today(),1)?' завтра':' '+dshow(isoOf(d)).slice(0,5))}
@@ -1514,7 +1514,7 @@ function openExp(id){
 }
 
 /* ===== НАСТРОЙКИ ===== */
-function saveConfig(patch){const c={...cfg(),...patch};return setDoc(BASE+'/config/app',{statuses:c.statuses,statusesV:3,accrual:c.accrual,rules:c.rules,sessionMin:c.sessionMin,updatedAt:nowIso()})}
+function saveConfig(patch){const c={...cfg(),...patch};return setDoc(BASE+'/config/app',{statuses:c.statuses,statusesV:4,accrual:c.accrual,rules:c.rules,sessionMin:c.sessionMin,updatedAt:nowIso()})}
 function viewSettings(){
   const c=cfg();
   const viewers=Object.keys(S.viewers);resolveNames(viewers);
