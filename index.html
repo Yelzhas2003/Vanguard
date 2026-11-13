@@ -1537,13 +1537,19 @@ function viewMe(){
   const myClients=liveClients().filter(c=>!c.archived&&(c.teacherId===me.id||c.techId===me.id||c.soldBy===me.id||((c.rates&&c.rates.extras)||[]).some(x=>x.empId===me.id)))
     .sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9'));
   const upcoming=schItemsFor(me.id,today(),addDays(today(),13));
+  const myFree=liveSched().filter(w=>w.type==='slot'&&w.playerId===me.id&&!slotOwner(w)&&w.date>=today()&&w.date<=addDays(today(),13)).sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
   const roleOf=c=>[c.teacherId===me.id?'учитель':'',c.techId===me.id?'тех':'',c.soldBy===me.id?'продажа':'',((c.rates&&c.rates.extras)||[]).some(x=>x.empId===me.id)?'доплата':''].filter(Boolean).join(', ');
   const k=(l,v,h)=>`<div class="kpi ${h?'hero':''}"><div class="k">${l}</div><div class="v">${v}</div></div>`;
   return `<div class="card" style="margin-bottom:16px"><div class="row"><div class="grow"><div style="font-size:22px;font-weight:700">${esc(me.name)}</div>
       <div class="row" style="gap:6px;margin-top:8px">${(me.roles||[]).map(r=>`<span class="chip acc">${(ROLES.find(x=>x.id===r)||{}).name}</span>`).join('')}${(me.cities||[]).map(c=>`<span class="chip">${CITY_NAME[c]}</span>`).join('')}</div></div>
       <div class="small muted" style="text-align:right">${me.email?'Логин: '+esc(emailToLogin(me.email))+'<br>':''}${rolesSummary(me)}</div></div></div>
+    <div class="row" style="margin-bottom:14px"><button class="btn pri big" data-act="myFree">+ Свободное время</button><a class="btn big" href="#schedule">Расписание</a></div>
     <div class="kpis">${k('К выплате сейчас',money(due),true)}${k('Текущий период ('+shortPeriod(cur)+')',money(period))}${k('За этот месяц',money(month))}${k('Выплачено за всё время',money(paidAll))}${k('Заработано за всё время',money(earnedAll))}</div>
     <div class="charts" style="grid-template-columns:repeat(auto-fit,minmax(380px,1fr))">
+      <div class="chartbox"><div class="row"><h3 class="grow">Моё свободное время</h3><button class="btn sm" data-act="myFree">+ Добавить</button></div>
+        ${myFree.length?`<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">${myFree.map(w=>`<div class="ev free" style="--ec:${SLOT_FREE}" data-slot="${w.id}"><span class="tm">${WD[(new Date(w.date+'T00:00:00').getDay()+6)%7]}, ${dshow(w.date).slice(0,5)} · ${w.start}–${fromMin(toMin(w.start)+num(w.dur))}</span></div>`).join('')}</div>`
+          :'<div class="muted small" style="margin-top:10px">Вы ещё не отметили свободное время на ближайшие 2 недели — без него вас не предложат в связку.</div>'}
+        <div class="tiny muted" style="margin-top:8px">Нажмите на окно, чтобы удалить его.</div></div>
       <div class="chartbox"><h3>Ближайшие 2 недели</h3>
         ${upcoming.length?`<div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">${upcoming.map(it=>`<div class="row" style="gap:10px;flex-wrap:nowrap"><div class="small num" style="width:92px;flex:none">${WD[(new Date(it.date+'T00:00:00').getDay()+6)%7]}, ${dshow(it.date).slice(0,5)}</div><div class="grow">${evHtml(it,true)}</div></div>`).join('')}</div>`:'<div class="muted small" style="margin-top:10px">Ничего не запланировано</div>'}
         <div style="margin-top:12px"><a href="#schedule">Открыть расписание →</a></div></div>
@@ -1613,10 +1619,10 @@ function schItemsFor(empId,from,to){
   return buildItems(from,to,{free:false,ev:x=>partIds(x).includes(empId),cl:c=>c.teacherId===empId||c.techId===empId}).map(it=>({...it,who:it.kind==='session'?it.who:''}));
 }
 /* добавление свободного времени пачкой */
-function openSlots(date){
+function openSlots(date,pid){
   const me=myEmp();const own=isOwner();
   const cityDef=S.sch.city||(me&&(me.cities||[])[0])||'astana';
-  const X={city:cityDef,playerId:own?'':(me?me.id:''),from:date||today(),to:date||addDays(today(),13),days:date?[(new Date(date+'T00:00:00').getDay()+6)%7]:[0,1,2,3,4],t1:'10:00',t2:'18:00'};
+  const X={city:cityDef,playerId:pid||(me?me.id:''),from:date||today(),to:date||addDays(today(),13),days:date?[(new Date(date+'T00:00:00').getDay()+6)%7]:[0,1,2,3,4],t1:'10:00',t2:'18:00'};
   openModal('<div id="slf"></div>',{});
   const gen=()=>{const out=[];const a=toMin(X.t1),b=toMin(X.t2);if(!(b>a))return out;
     let d=X.from;let g=0;while(d<=X.to&&g++<120){if(X.days.includes((new Date(d+'T00:00:00').getDay()+6)%7)&&d>=today())out.push({date:d});d=addDays(d,1)}
@@ -1629,8 +1635,8 @@ function openSlots(date){
     const roleTxt=e=>whereText(e);
     const n=X.playerId?gen().length:0;const L=cfg().sessionMin;const len=toMin(X.t2)-toMin(X.t1);
     box.innerHTML=`<div class="mh"><h2>Свободное время</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
-      <p class="small muted" style="margin-top:0">Отметьте, когда вы свободны — один раз, без выбора города. Клиенту предлагается время, когда одновременно свободны тех специалист его города и учитель — минимум ${L/60} ч подряд.</p>
-      <div class="field"><label class="lbl">Кто</label>${own?`<select class="select" id="sl-player"><option value="">— выберите игрока —</option>${players.map(e=>`<option value="${e.id}" ${X.playerId===e.id?'selected':''}>${esc(e.name)} · ${esc(roleTxt(e))}</option>`).join('')}</select>`:`<div><b>${esc(me?me.name:'')}</b> · ${esc(me?roleTxt(me):'')||'<span style="color:var(--warn)">нет роли учителя или тех специалиста</span>'}</div>`}</div>
+      <p class="small muted" style="margin-top:0">Отметьте свободное время — своё или коллеги, один раз, без выбора города. Клиенту предлагается время, когда одновременно свободны тех специалист его города и учитель — минимум ${L/60} ч подряд.</p>
+      <div class="field"><label class="lbl">Кто</label>${true?`<select class="select" id="sl-player"><option value="">— выберите игрока —</option>${players.map(e=>`<option value="${e.id}" ${X.playerId===e.id?'selected':''}>${esc(e.name)} · ${esc(roleTxt(e))}</option>`).join('')}</select>`:`<div><b>${esc(me?me.name:'')}</b> · ${esc(me?roleTxt(me):'')||'<span style="color:var(--warn)">нет роли учителя или тех специалиста</span>'}</div>`}</div>
       ${P?`<div class="info">Время одно на все города. ${esc(P.name)} будет предлагаться так: <b>${esc(whereText(P))}</b>.</div>`:''}
       <div class="grid2"><div class="field"><label class="lbl">С даты</label><input type="date" class="input" id="sl-from" value="${X.from}"></div><div class="field"><label class="lbl">По дату</label><input type="date" class="input" id="sl-to" value="${X.to}"></div></div>
       <div class="field"><label class="lbl">Дни недели</label><div class="seg" data-sdays>${WD.map((w,i)=>`<button type="button" data-v="${i}" class="${X.days.includes(i)?'on':''}">${w}</button>`).join('')}</div>
@@ -1661,7 +1667,7 @@ function openSlot(id){
   const s=S.sched[id];if(!s)return;
   const legacyC=slotOwner(s)?S.clients[slotOwner(s)]:null;
   if(legacyC){closeModal&&0;openClient(legacyC.id);return}
-  const me=myEmp();const canEdit=S.canWrite&&(isOwner()||(me&&me.id===s.playerId));
+  const me=myEmp();const canEdit=S.canWrite;
   const a=toMin(s.start),b=a+num(s.dur);
   const inside=liveSched().filter(x=>x.type==='session'&&sessLive(x)&&x.date===s.date&&partIds(x).includes(s.playerId)&&toMin(x.start)<b&&toMin(x.start)+num(x.dur)>a);
   const m=openModal(`<div class="mh"><h2>Свободное время</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
@@ -1963,7 +1969,8 @@ function exportPayouts(fmt){
 function bindView(r){
   const v=$('#view');
   v.onclick=async e=>{
-    if(r==='schedule'&&schedClick(e))return;
+    if((r==='schedule'||r==='me')&&schedClick(e))return;
+    if(e.target.closest('[data-act="myFree"]')){const m=myEmp();openSlots(null,m&&m.id);return}
     const t=e.target.closest('[data-act],[data-mode],[data-cid],[data-emp-edit],[data-emp-del],[data-emp-card],[data-staff],[data-pay],[data-pay-open],[data-unpay],[data-anmode],[data-anser],[data-exp],[data-rule-edit],[data-rule-del],[data-st-up],[data-st-del],[data-seg] button');
     if(!t)return;const d=t.dataset;
     if(d.unpay!==undefined){e.preventDefault();e.stopPropagation();return unpay(S.pay.period,d.unpay,Number(d.i))}
