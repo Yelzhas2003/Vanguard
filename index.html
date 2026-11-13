@@ -662,7 +662,7 @@ function kcard(c,s,own,me,showCity){
     <div class="nm"><span>${esc(c.name||'Без имени')}</span><span class="badge">${esc(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||'')}</span></div>
     <div class="meta">${showCity?esc(CITY_NAME[c.city]||'')+' · ':''}${c.examDate?'Экзамен: '+dshow(c.examDate)+(c.examTime?' '+c.examTime:''):(statusById(c.status).id==='bron'?'<span class="muted">Дата не выбрана</span>':'<span style="color:var(--warn);font-weight:600">Дата пока не выбрана</span>')}<br>
     ${c.level||c.target||c.deadline?'Уровень '+esc(c.level||'—')+' → '+esc(c.target||'—')+(c.deadline?' · дедлайн '+dshow(c.deadline):'')+'<br>':''}
-    ${closedOutcome(c)?(closedOutcome(c)==='good'?'<span style="color:var(--ok);font-weight:600">Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):'')+'</span><br>':'<span style="color:var(--danger);font-weight:600">Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':'')+'</span><br>'):''}
+    ${closedOutcome(c)?(closedOutcome(c)==='good'?'<span style="color:var(--ok);font-weight:600">Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):'')+'</span><br>':'<span style="color:var(--danger);font-weight:600">Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':'')+'</span>'+(c.closed&&(c.closed.reasons||[]).length?'<br>Причина: '+c.closed.reasons.map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', '):'')+'<br>'):''}
     ${c.retake?'<span style="font-weight:600">Пересдача '+(c.retake.kind==='paid'?'платная'+(c.retake.fee?' +'+money(c.retake.fee):''):c.retake.kind==='free'?'бесплатная':c.retake.kind==='expense'?'расходная'+(c.retake.fee?' −'+money(c.retake.fee):''):'')+'</span>'+(c.retake.date?' · '+dshow(c.retake.date)+(c.retake.time?' '+c.retake.time:''):' · дата не выбрана')+'<br>':''}
     ${num(c.refund)?'<span style="color:var(--danger);font-weight:600">Возврат '+money(c.refund)+(c.refundMode==='pct'&&c.refundPct!==''?' ('+c.refundPct+'%)':'')+'</span><br>':''}
     ${money(r.cost)} · оплачено ${r.pct}%<br>
@@ -871,19 +871,21 @@ function drawClientForm(){
       <div class="field" style="margin-bottom:0"><label class="lbl">Комментарий к пересдаче</label><textarea class="input" id="rt-comment" rows="2">${esc(rt?rt.comment:'')}</textarea></div>
     </div>`:''}
     ${c.status==='closed'||c.closed?`<div class="card" style="margin-bottom:16px;border-color:${statusById('closed').color};padding:16px">
-      <b>Фидбэк по сделке</b>
-      <div class="grid3" style="margin-top:12px">
+      <b>Итог сделки</b>
+      <div class="field" style="margin-top:12px"><label class="lbl">Клиент доволен? <span style="color:var(--danger)">*</span></label>${seg('cout',[{id:'good',name:'Доволен — отличный результат'},{id:'bad',name:'Недоволен — возврат'}],c.closed.outcome)}</div>
+      ${c.closed.outcome==='good'?`<div class="grid3">
         <div class="field"><label class="lbl">Сколько баллов набрал</label><input class="input" id="cl-score" value="${esc(c.closed.score||'')}" placeholder="напр. 7.0 / 95"></div>
         <div class="field"><label class="lbl">Уровень / результат</label><input class="input" id="cl-result" value="${esc(c.closed.result||'')}" placeholder="напр. C1"></div>
         <div class="field"><label class="lbl">Сколько попыток</label><input class="input" id="cl-attempts" inputmode="numeric" value="${esc(c.closed.attempts||'')}"></div>
-      </div>
-      <div class="field"><label class="lbl">Клиент доволен? <span style="color:var(--danger)">*</span></label>${seg('cout',[{id:'good',name:'Доволен — отличный результат'},{id:'bad',name:'Недоволен — возврат'}],c.closed.outcome)}</div>
+      </div>`:''}
+      ${c.closed.outcome==='bad'?`<div class="field"><label class="lbl">Почему не получилось сдать</label>
+        <div style="display:flex;flex-direction:column;gap:8px">${[['internet','Проблемы с интернетом'],['late','Опоздание']].map(([k,n])=>`<label class="check"><input type="checkbox" data-reason="${k}" ${(c.closed.reasons||[]).includes(k)?'checked':''}> ${n}</label>`).join('')}</div></div>`:''}
       ${c.closed.outcome==='bad'?`<div class="field"><label class="lbl">Возврат</label>${seg('crefund',[{id:'partial',name:'Частичный'},{id:'full',name:'Полный'}],c.closed.refundType)}
         ${c.closed.refundType==='full'?`<div class="small" style="margin-top:8px">Возвращаем всю оплату: <b>${money(gross(c))}</b></div>`:''}
         ${c.closed.refundType==='partial'?`<div class="row" style="margin-top:10px">${seg('refmode',[{id:'pct',name:'Процентом'},{id:'sum',name:'Суммой'}],c.refundMode)}
           ${c.refundMode==='pct'?`<div class="pct"><input class="input" id="c-refundPct" inputmode="decimal" value="${esc(c.refundPct)}">%</div><span class="small muted">от ${money(gross(c))} = <b id="refAmt">${money(c.refund)}</b></span>`
             :`<input class="input num" id="c-refund" inputmode="numeric" value="${nfmt(num(c.refund))}" style="max-width:200px"><span class="small muted">₸</span>`}</div>`:''}</div>`:''}
-      <div class="field" style="margin-bottom:0"><label class="lbl">Комментарий</label><textarea class="input" id="cl-comment" rows="2">${esc(c.closed.comment||c.refundComment||'')}</textarea></div>
+      ${c.closed.outcome?`<div class="field" style="margin-bottom:0"><label class="lbl">${c.closed.outcome==='bad'?'Причина / комментарий':'Комментарий'}</label><textarea class="input" id="cl-comment" rows="2" placeholder="${c.closed.outcome==='bad'?'Что произошло':''}">${esc(c.closed.comment||c.refundComment||'')}</textarea></div>`:''}
     </div>`:''}
     </div>
     <div class="grid2">
@@ -972,6 +974,7 @@ function bindClientForm(box){
   const rd=$('#retake-date',box);if(rd)rd.onchange=()=>{F.retake.date=rd.value};const rtm=$('#retake-time',box);if(rtm)rtm.onchange=()=>{F.retake.time=rtm.value};
   const rc=$('#rt-comment',box);if(rc)rc.oninput=()=>{F.retake.comment=rc.value};
   [['cl-score','score'],['cl-result','result'],['cl-attempts','attempts'],['cl-comment','comment']].forEach(([id,k])=>{const el=$('#'+id,box);if(el)el.oninput=()=>{F.closed[k]=el.value}});
+  $$('[data-reason]',box).forEach(el=>el.onchange=()=>{const r=new Set(F.closed.reasons||[]);el.checked?r.add(el.dataset.reason):r.delete(el.dataset.reason);F.closed.reasons=[...r]});
   const moneyIn=(id,get,set)=>{const el=$('#'+id,box);if(!el)return;
     el.oninput=()=>{set(el.value.replace(/[^\d]/g,''));if(id!=='c-refund')recalcRefund();drawCalc()};
     el.onblur=()=>{if(el.value!=='')el.value=nfmt(num(get()))};el.onfocus=()=>el.select()};
@@ -1022,7 +1025,8 @@ async function saveClient(){
     refund:Math.round(num(c.refund)),refundMode:c.refundMode||'sum',refundPct:c.refundMode==='pct'?num(c.refundPct):'',refundComment:c.closed&&c.closed.outcome==='bad'?String(c.closed.comment||'').trim():String(c.refundComment||'').trim(),
     expense:Math.round(num(c.expense)),comment:String(c.comment||'').trim(),
     level:String(c.level||'').trim(),target:String(c.target||'').trim(),deadline:c.deadline||'',
-    closed:c.closed?{outcome:c.closed.outcome||'',score:String(c.closed.score||'').trim(),result:String(c.closed.result||'').trim(),attempts:String(c.closed.attempts||'').trim(),refundType:c.closed.outcome==='bad'?c.closed.refundType:'',comment:String(c.closed.comment||'').trim()}:null,
+    closed:c.closed?{outcome:c.closed.outcome||'',score:c.closed.outcome==='good'?String(c.closed.score||'').trim():'',result:c.closed.outcome==='good'?String(c.closed.result||'').trim():'',attempts:c.closed.outcome==='good'?String(c.closed.attempts||'').trim():'',
+      reasons:c.closed.outcome==='bad'?(c.closed.reasons||[]):[],refundType:c.closed.outcome==='bad'?c.closed.refundType:'',comment:String(c.closed.comment||'').trim()}:null,
     rates:{teacher:num(c.rates.teacher),tech:num(c.rates.tech),sales:c.soldBy==='self'?0:num(c.rates.sales),extras:(c.rates.extras||[]).map(x=>({empId:x.empId,pct:num(x.pct),ruleId:x.ruleId||null}))},
     archived:!!(old&&old.archived),deleted:false,
     createdAt:old?old.createdAt:nowIso(),createdBy:old?old.createdBy:(S.uid||''),updatedAt:nowIso(),updatedBy:S.uid||''};
