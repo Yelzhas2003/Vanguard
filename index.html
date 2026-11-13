@@ -277,7 +277,7 @@ body:before{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradi
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 14:00</div>
+    <div class="tiny muted" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 14:10</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -680,7 +680,7 @@ function kcard(c,s,own,me,showCity){
   const r=calcClient(c);
   const mine=me?(r.byEmp[me.id]||0):0;
   return `<div class="kcard" draggable="${S.canWrite}" data-cid="${c.id}" style="--sc:${s.color}">
-    <div class="nm"><span>${esc(c.name||'Без имени')}</span><span class="badge">${esc(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||'')}</span></div>
+    <div class="nm"><span>${esc(c.name||'Без имени')}</span><span class="badge" style="display:inline-flex;align-items:center">${examLabel(c)}</span></div>
     <div class="meta">${showCity?esc(CITY_NAME[c.city]||'')+' · ':''}${c.examDate?'Экзамен: '+dshow(c.examDate)+(c.examTime?' '+c.examTime:'')+'<br>':(statusById(c.status).id==='bron'?'<span class="muted">Дата не выбрана</span><br>':statusById(c.status).id==='offered'?'':'<span style="color:var(--warn);font-weight:600">Дата пока не выбрана</span><br>')}
     ${c.level||c.target||c.deadline?'Уровень '+esc(c.level||'—')+' → '+esc(c.target||'—')+(c.deadline?' · дедлайн '+dshow(c.deadline):'')+'<br>':''}
     ${closedOutcome(c)?(closedOutcome(c)==='good'?'<span style="color:var(--ok);font-weight:600">Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):'')+'</span><br>':'<span style="color:var(--danger);font-weight:600">Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':'')+'</span>'+(c.closed&&(c.closed.reasons||[]).length?'<br>Причина: '+c.closed.reasons.map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', '):'')+'<br>'):''}
@@ -706,7 +706,7 @@ function clientTable(list,own,me){
     :['Клиент','Экзамен','Город','Дата экз.','Статус','Стоимость','% опл.','Учитель','Тех','Ваша доля'];
   const R=['Стоимость','% опл.','Оплачено','Возврат','Выручка','Доля уч.','Доля тех','Доля прод.','Доплаты','Расходы','Vanguard','Ваша доля'];
   const body=rows.map(({c,r,teacher,tech,sales,extra})=>{const s=statusById(c.status);
-    const base=[esc(c.name),esc(c.exam==='Другое'&&c.examOther?c.examOther:c.exam),esc(CITY_NAME[c.city]||''),dshow(c.examDate),`<span class="chip"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</span>`];
+    const base=[esc(c.name),examLabel(c),esc(CITY_NAME[c.city]||''),dshow(c.examDate),`<span class="chip"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</span>`];
     const cells=own?[...base,nfmt(r.cost),r.pct+'%',nfmt(r.paid),nfmt(r.refund),nfmt(r.revenue),esc(empName(c.teacherId)),nfmt(teacher),esc(empName(c.techId)),nfmt(tech),esc(empName(c.soldBy)),nfmt(sales),nfmt(extra),nfmt(r.expense),'<b>'+nfmt(r.vanguard)+'</b>']
       :[...base,nfmt(r.cost),r.pct+'%',esc(empName(c.teacherId)),esc(empName(c.techId)),nfmt(me?(r.byEmp[me.id]||0):0)];
     return `<tr class="click" data-cid="${c.id}">${cells.map((x,i)=>`<td class="${R.includes(head[i])?'r':''}">${x}</td>`).join('')}</tr>`}).join('');
@@ -725,6 +725,9 @@ function planOf(c){if(c.payPlan&&(PAY_PLANS[c.payPlan]||c.payPlan==='custom'))re
 function partsOf(c){const pl=planOf(c);if(pl==='custom')return [];const n=PAY_PLANS[pl].length;if(Array.isArray(c.payParts)&&c.payParts.length===n)return c.payParts.slice();
   if(pl==='100')return [true];if(c.paidMode==='50')return [true,false];return PAY_PLANS[pl].map((_,i)=>i===0)}
 function pctFromParts(pl,parts){return 100}
+const EXAM_ICON={'TOEFL iBT':'assets/exam-toefl.png','Duolingo':'assets/exam-duolingo.png','IELTS':''};
+function examIcon(ex,size){const u=EXAM_ICON[ex];return u?`<img src="${u}" alt="" style="width:${size||14}px;height:${size||14}px;vertical-align:-2px;margin-right:5px">`:''}
+function examLabel(c){const n=c.exam==='Другое'&&c.examOther?c.examOther:(c.exam||'');return examIcon(c.exam)+esc(n)}
 function blankClient(city){
   return {id:null,name:'',exam:'IELTS',examOther:'',city:city||'astana',examDate:'',examTime:'',dateMode:'tbd',slotId:'',level:'',target:'',deadline:'',closed:null,payDate:today(),cost:'',paidMode:'100',paidPct:100,payPlan:'100',payParts:[true],
     soldBy:'',teacherId:'',techId:'',status:cfg().statuses[0].id,addon:'none',refund:0,refundMode:'pct',refundPct:'',refundComment:'',retake:null,expense:0,comment:'',rates:{teacher:0,tech:0,sales:0,extras:[]}};
@@ -902,7 +905,7 @@ function drawClientForm(){
   <div class="mh"><h2>${c.id?esc(c.name||'Клиент'):'Новый клиент'}</h2><button class="iconbtn" data-x>✕</button></div>
   <div class="mb">
     <div class="field"><label class="lbl">Имя клиента</label><input class="input" id="c-name" value="${esc(c.name)}" placeholder="Фамилия Имя" autocomplete="off"></div>
-    <div class="field"><label class="lbl">Экзамен</label>${seg('exam',EXAMS.map(x=>({id:x,name:x})),c.exam)}
+    <div class="field"><label class="lbl">Экзамен</label><div class="seg" data-seg="exam">${EXAMS.map(x=>`<button type="button" data-v="${esc(x)}" class="${c.exam===x?'on':''}" style="display:inline-flex;align-items:center">${examIcon(x,16)}${esc(x)}</button>`).join('')}</div>
       ${c.exam==='Другое'?`<input class="input" id="c-examOther" style="margin-top:8px" placeholder="Какой экзамен?" value="${esc(c.examOther||'')}">`:''}</div>
     <div class="field"><label class="lbl">Город</label>${seg('city',CITIES,c.city)}</div>
     <div class="grid2">
@@ -1466,7 +1469,7 @@ function viewAnalytics(){
   </div>
   <div class="tablewrap" style="margin-top:12px"><table class="t"><thead><tr><th>Клиент</th><th>Город</th><th>Экзамен</th><th>Связка</th><th>Возврат</th><th class="r">Сумма</th><th>Причина</th><th>Комментарий</th></tr></thead><tbody>
     ${s.bad.sort((x,y)=>String(y.updatedAt||'').localeCompare(String(x.updatedAt||''))).map(c=>{const cl_=c.closed||{};const rs=(cl_.reasons||[]).map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', ');
-      return `<tr class="click" data-cid="${c.id}"><td><b>${esc(c.name)}</b></td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${esc(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||'')}</td><td>${esc(empName(c.techId))} + ${esc(empName(c.teacherId))}</td>
+      return `<tr class="click" data-cid="${c.id}"><td><b>${esc(c.name)}</b></td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${examLabel(c)}</td><td>${esc(empName(c.techId))} + ${esc(empName(c.teacherId))}</td>
         <td>${cl_.refundType==='full'?'полный':cl_.refundType==='partial'?'частичный':'—'}</td><td class="r">${nfmt(c.refund)}</td><td>${esc(rs||'—')}</td><td style="white-space:normal;min-width:180px">${esc(cl_.comment||c.refundComment||'')}</td></tr>`}).join('')}
   </tbody></table></div>`:'<div class="card empty"><b>Недовольных клиентов за этот период нет</b>Здесь появятся возвраты, причины и связки, если клиент закрыт как «недоволен».</div>'}`;
 }
@@ -1678,7 +1681,7 @@ function viewMe(){
     </div>
     <div class="sectiontitle">Мои клиенты (${myClients.length})</div>
     ${myClients.length?`<div class="tablewrap"><table class="t"><thead><tr><th>Клиент</th><th>Экзамен</th><th>Город</th><th>Дата экзамена</th><th>Статус</th><th>Моя роль</th><th class="r">Моя доля</th></tr></thead><tbody>
-      ${myClients.map(c=>{const s=statusById(c.status);const r=calcClient(c);return `<tr class="click" data-cid="${c.id}"><td><b>${esc(c.name)}</b></td><td>${esc(c.exam==='Другое'&&c.examOther?c.examOther:c.exam)}</td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${dshow(c.examDate)}${c.examTime?' '+c.examTime:''}</td><td><span class="chip"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</span></td><td>${roleOf(c)}</td><td class="r"><b>${nfmt(r.byEmp[me.id]||0)}</b></td></tr>`}).join('')}</tbody></table></div>`
+      ${myClients.map(c=>{const s=statusById(c.status);const r=calcClient(c);return `<tr class="click" data-cid="${c.id}"><td><b>${esc(c.name)}</b></td><td>${examLabel(c)}</td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${dshow(c.examDate)}${c.examTime?' '+c.examTime:''}</td><td><span class="chip"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</span></td><td>${roleOf(c)}</td><td class="r"><b>${nfmt(r.byEmp[me.id]||0)}</b></td></tr>`}).join('')}</tbody></table></div>`
       :'<div class="card empty"><b>Пока нет клиентов</b>Клиенты появятся здесь, когда вас укажут в анкете.</div>'}`;
 }
 function drawMe(){
