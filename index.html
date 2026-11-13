@@ -739,7 +739,7 @@ function busyOf(pid,date,excl){
     (x.type==='session'&&sessLive(x)&&x.clientId!==excl)||(x.type==='slot'&&slotOwner(x)&&slotOwner(x)!==excl)||(x.type!=='slot'&&x.type!=='session')))
     .map(x=>[toMin(x.start),toMin(x.start)+num(x.dur||60)]);
 }
-function windowsOf(pid,city,date){const rem=isRemote(pid);return liveSched().filter(x=>x.type==='slot'&&x.playerId===pid&&(rem||x.city===city||x.city==='all')&&x.date===date&&!slotOwner(x))}
+function windowsOf(pid,city,date){return liveSched().filter(x=>x.type==='slot'&&x.playerId===pid&&x.date===date&&!slotOwner(x))}
 function freeAt(pid,city,date,a,b,excl){
   return windowsOf(pid,city,date).some(w=>toMin(w.start)<=a&&toMin(w.start)+num(w.dur)>=b)&&!busyOf(pid,date,excl).some(([x,y])=>x<b&&y>a);
 }
@@ -748,7 +748,7 @@ function pairOptions(city,excl,from,to){
   const techs=liveEmps().filter(e=>e.active!==false&&hasRole(e,city,'tech'));
   const teachers=liveEmps().filter(e=>e.active!==false&&hasRole(e,city,'teacher'));
   const out=[];const seen=new Set();
-  liveSched().filter(w=>w.type==='slot'&&(w.city===city||w.city==='all'||isRemote(w.playerId))&&w.date>=from&&w.date<=to&&!slotOwner(w)&&techs.some(t=>t.id===w.playerId)).forEach(w=>{
+  liveSched().filter(w=>w.type==='slot'&&w.date>=from&&w.date<=to&&!slotOwner(w)&&techs.some(t=>t.id===w.playerId)).forEach(w=>{
     const ws=toMin(w.start),we=ws+num(w.dur);
     for(let t=ws;t+L<=we;t+=60){
       if(w.date===td&&t<=nm)continue;
@@ -1530,7 +1530,7 @@ function buildItems(from,to,pf){
     if(x.type==='slot'){const cid=slotOwner(x);const c=cid?S.clients[cid]:null;
       if(!c&&pf.free===false)return;
       items.push({kind:'slot',id:x.id,date:x.date,start:x.start,end,free:!c,color:c?(x.bookKind==='retake'?RETAKE_COLOR:EXAM_COLOR):SLOT_FREE,
-        type:c?(x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam||'')):'Свободен · '+freeRoleLabel(x),title:c?c.name:'',who:empName(x.playerId),city:isRemote(x.playerId)?'all':x.city,conf:false});return}
+        type:c?(x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam||'')):'Свободен · '+freeRoleLabel(x),title:c?c.name:'',who:empName(x.playerId),city:c?x.city:'all',conf:false});return}
     items.push({kind:'ev',id:x.id,date:x.date,start:x.start||'',end,color:evType(x.type).color,type:evType(x.type).name,
       title:x.clientId&&S.clients[x.clientId]?S.clients[x.clientId].name:(x.title||''),who:empName(x.playerId),city:x.city,conf:conflictsOf(x,all.filter(y=>y.type!=='slot')).length>0,comment:x.comment||''})});
   const live=id=>id&&S.sched[id]&&(sessLive(S.sched[id])||(S.sched[id].type==='slot'&&!S.sched[id].deleted&&slotOwner(S.sched[id])));
@@ -1541,15 +1541,16 @@ function buildItems(from,to,pf){
   });
   return items.sort((a,b)=>(a.date+(a.start||'99')).localeCompare(b.date+(b.start||'99')));
 }
-function freeRoleLabel(x){const e=emp(x.playerId);const out=[];
-  if(isRemote(e))out.push('учитель удалённо');else if(rolesIn(e,x.city).includes('teacher'))out.push('учитель');
-  const techC=CITIES.filter(c=>rolesIn(e,c.id).includes('tech')&&(x.city==='all'||isRemote(e)||x.city===c.id));
-  if(techC.length)out.push('тех'+(isRemote(e)||x.city==='all'?' ('+techC.map(c=>c.name).join(', ')+')':''));
-  return out.join(', ')||'—'}
+function whereText(e){if(!e)return '';const out=[];
+  const tc=CITIES.filter(c=>hasRole(e,c.id,'teacher'));const hc=CITIES.filter(c=>hasRole(e,c.id,'tech'));
+  if(tc.length)out.push('учитель: '+(tc.length===3?'все города':tc.map(c=>c.name).join(', ')));
+  if(hc.length)out.push('тех: '+(hc.length===3?'все города':hc.map(c=>c.name).join(', ')));
+  return out.join(' · ')}
+function freeRoleLabel(x){return whereText(emp(x.playerId))||'—'}
 function schItems(from,to){
   const me=myEmp();const f=S.sch;const mine=schMine()&&me;
   return buildItems(from,to,{free:f.slots!==false,
-    ev:x=>(!f.city||x.city===f.city||x.city==='all'||(x.type==='slot'&&isRemote(x.playerId)))&&(!f.player||partIds(x).includes(f.player))&&(!mine||partIds(x).includes(me.id)),
+    ev:x=>(!f.city||(x.type==='slot'&&!slotOwner(x)?(hasRole(emp(x.playerId),f.city,'teacher')||hasRole(emp(x.playerId),f.city,'tech')):x.city===f.city))&&(!f.player||partIds(x).includes(f.player))&&(!mine||partIds(x).includes(me.id)),
     cl:c=>(!f.city||c.city===f.city)&&(!f.player||c.teacherId===f.player||c.techId===f.player)&&(!mine||c.teacherId===me.id||c.techId===me.id)});
 }
 function schItemsFor(empId,from,to){
@@ -1568,16 +1569,13 @@ function openSlots(date){
   const draw=()=>{const box=$('#slf');
     const workCities=e=>CITIES.filter(c=>rolesIn(e,c.id).some(r=>r==='tech'||r==='teacher'));
     const players=liveEmps().filter(e=>e.active!==false&&(isRemote(e)||workCities(e).length));
-    const P=emp(X.playerId);const rem=isRemote(P);
-    const cities=P?workCities(P):(own?CITIES:[]);
-    if(P&&!rem&&cities.length&&!cities.some(c=>c.id===X.city))X.city=cities[0].id;
-    const roleTxt=e=>{const o=[];if(isRemote(e))o.push('учитель удалённо');CITIES.forEach(c=>{const r=rolesIn(e,c.id).filter(x=>x!=='sales'&&!(x==='teacher'&&isRemote(e)));if(r.length)o.push(c.name+': '+r.map(x=>x==='tech'?'тех':'учитель').join(', '))});return o.join(' · ')};
+    const P=emp(X.playerId);
+    const roleTxt=e=>whereText(e);
     const n=X.playerId?gen().length:0;const L=cfg().sessionMin;const len=toMin(X.t2)-toMin(X.t1);
     box.innerHTML=`<div class="mh"><h2>Свободное время</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
-      <p class="small muted" style="margin-top:0">Отметьте, когда вы свободны. Запись клиенту предлагается только там, где одновременно свободны тех специалист и учитель одного города — минимум ${L/60} ч подряд.</p>
+      <p class="small muted" style="margin-top:0">Отметьте, когда вы свободны — один раз, без выбора города. Клиенту предлагается время, когда одновременно свободны тех специалист его города и учитель — минимум ${L/60} ч подряд.</p>
       <div class="field"><label class="lbl">Кто</label>${own?`<select class="select" id="sl-player"><option value="">— выберите игрока —</option>${players.map(e=>`<option value="${e.id}" ${X.playerId===e.id?'selected':''}>${esc(e.name)} · ${esc(roleTxt(e))}</option>`).join('')}</select>`:`<div><b>${esc(me?me.name:'')}</b> · ${esc(me?roleTxt(me):'')||'<span style="color:var(--warn)">нет роли учителя или тех специалиста</span>'}</div>`}</div>
-      ${!P?'':rem?`<div class="info"><b>Все города.</b> ${esc(P.name)} — учитель удалённо: это время подходит для клиентов любого города${workCities(P).some(c=>rolesIn(P,c.id).includes('tech'))?', а как тех специалист — только для '+workCities(P).filter(c=>rolesIn(P,c.id).includes('tech')).map(c=>c.name).join(', '):''}.</div>`
-        :`<div class="field"><label class="lbl">Город</label>${seg('scity',cities,X.city)}</div>`}
+      ${P?`<div class="info">Время одно на все города. ${esc(P.name)} будет предлагаться так: <b>${esc(whereText(P))}</b>.</div>`:''}
       <div class="grid2"><div class="field"><label class="lbl">С даты</label><input type="date" class="input" id="sl-from" value="${X.from}"></div><div class="field"><label class="lbl">По дату</label><input type="date" class="input" id="sl-to" value="${X.to}"></div></div>
       <div class="field"><label class="lbl">Дни недели</label><div class="seg" data-sdays>${WD.map((w,i)=>`<button type="button" data-v="${i}" class="${X.days.includes(i)?'on':''}">${w}</button>`).join('')}</div>
         <div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn sm" data-preset="wd">Будни</button><button type="button" class="btn sm" data-preset="we">Выходные</button><button type="button" class="btn sm" data-preset="all">Каждый день</button></div></div>
@@ -1597,7 +1595,7 @@ function openSlots(date){
     $('#sl-t2',box).onchange=e=>{X.t2=e.target.value;draw()};
     $('[data-save]',box).onclick=async()=>{const list=gen();if(!list.length)return;closeModal();const a=toMin(X.t1),b=toMin(X.t2);
       toast('Сохраняю: '+list.length+' дн.…');
-      try{for(const o of list)await setDoc(BASE+'/schedule/'+newId('schedule'),{type:'slot',date:o.date,start:fromMin(a),dur:b-a,city:isRemote(X.playerId)?'all':X.city,playerId:X.playerId,clientId:'',bookKind:'',deleted:false,createdAt:nowIso(),createdBy:S.uid||''});
+      try{for(const o of list)await setDoc(BASE+'/schedule/'+newId('schedule'),{type:'slot',date:o.date,start:fromMin(a),dur:b-a,city:'all',playerId:X.playerId,clientId:'',bookKind:'',deleted:false,createdAt:nowIso(),createdBy:S.uid||''});
         toast('Свободное время добавлено: '+list.length+' дн.')}catch(e){}};
   };
   draw();
@@ -1612,7 +1610,7 @@ function openSlot(id){
   const inside=liveSched().filter(x=>x.type==='session'&&sessLive(x)&&x.date===s.date&&partIds(x).includes(s.playerId)&&toMin(x.start)<b&&toMin(x.start)+num(x.dur)>a);
   const m=openModal(`<div class="mh"><h2>Свободное время</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
     <div class="kpis" style="grid-template-columns:1fr 1fr;margin-bottom:12px"><div class="kpi"><div class="k">Когда</div><div class="v" style="font-size:18px">${WD[(new Date(s.date+'T00:00:00').getDay()+6)%7]}, ${dshow(s.date)}<br>${s.start}–${fromMin(b)}</div></div>
-    <div class="kpi"><div class="k">Кто</div><div class="v" style="font-size:18px">${esc(empName(s.playerId))}<br><span class="small muted">${esc(cityLabel(isRemote(s.playerId)?'all':s.city))}</span></div></div></div>
+    <div class="kpi"><div class="k">Кто</div><div class="v" style="font-size:18px">${esc(empName(s.playerId))}<br><span class="small muted">${esc(whereText(emp(s.playerId)))}</span></div></div></div>
     ${inside.length?`<div class="small"><b>Записи в это время:</b>${inside.map(x=>`<div style="padding:4px 0">${x.start}–${fromMin(toMin(x.start)+num(x.dur))} · ${esc(S.clients[x.clientId].name)} · ${esc(pairName(x))}</div>`).join('')}</div>`:'<div class="small muted">Записей пока нет. Клиента записывают через анкету: «Дата экзамена» → «По связкам».</div>'}
   </div><div class="mf"><button class="btn" data-x>Закрыть</button><div class="grow"></div>${canEdit?'<button class="btn danger" data-del>Удалить это окно</button>':''}</div>`,{cls:'narrow'});
   $$('[data-x]',m).forEach(b=>b.onclick=()=>closeModal());
