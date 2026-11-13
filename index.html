@@ -871,7 +871,7 @@ function drawClientForm(){
       :(c.examDate?`<div class="small muted" style="margin:-6px 0 14px">Назначена дата: ${dshow(c.examDate)} ${esc(c.examTime||'')} — при статусе «Бронь» она сохранится.</div>`:'')}
     ${c.status==='process'?`<div class="field"><label class="lbl">Адрес клиента</label><input class="input" id="c-address" value="${esc(c.address||'')}" placeholder="Улица, дом, квартира / ориентир"></div>`:''}
     <div id="statusblock">
-    ${c.status==='retake'||rt?`<div class="card" style="margin-bottom:16px;border-color:${statusById('retake').color};padding:16px">
+    ${c.status==='retake'?`<div class="card" style="margin-bottom:16px;border-color:${statusById('retake').color};padding:16px">
       <div class="row"><b class="grow">Пересдача</b>${c.status!=='retake'?'<button type="button" class="btn sm danger" data-act="dropRetake">Убрать пересдачу</button>':''}</div>
       <div class="field" style="margin-top:10px">${seg('rkind',[{id:'free',name:'Бесплатная'},{id:'paid',name:'Платная'},{id:'expense',name:'Расходная (платим мы)'}],rt?(rt.kind==='other'?'':rt.kind):'free')}</div>
       ${rt&&rt.kind==='paid'?`<div class="field"><label class="lbl">Клиент доплачивает, ₸ <span class="muted">(добавится к выручке)</span></label><input class="input num" id="rt-fee" inputmode="numeric" value="${rt.fee===''?'':nfmt(num(rt.fee))}" style="max-width:240px"></div>`:''}
@@ -879,7 +879,7 @@ function drawClientForm(){
       <div class="field"><label class="lbl">Дата пересдачи</label>${dateBlock('retake')}</div>
       <div class="field" style="margin-bottom:0"><label class="lbl">Комментарий к пересдаче</label><textarea class="input" id="rt-comment" rows="2">${esc(rt?rt.comment:'')}</textarea></div>
     </div>`:''}
-    ${c.status==='closed'||c.closed?`<div class="card" style="margin-bottom:16px;border-color:${statusById('closed').color};padding:16px">
+    ${c.status==='closed'&&c.closed?`<div class="card" style="margin-bottom:16px;border-color:${statusById('closed').color};padding:16px">
       <b>Итог сделки</b>
       <div class="field" style="margin-top:12px"><label class="lbl">Клиент доволен? <span style="color:var(--danger)">*</span></label>${seg('cout',[{id:'good',name:'Доволен — отличный результат'},{id:'bad',name:'Недоволен — возврат'}],c.closed.outcome)}</div>
       ${c.closed.outcome==='good'?`<div class="grid3">
