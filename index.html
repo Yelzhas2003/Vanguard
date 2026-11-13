@@ -93,7 +93,7 @@ svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-widt
 .tabs button.on{background:var(--soft);color:var(--text);font-weight:650}
 /* board */
 .board{display:flex;gap:12px;overflow-x:auto;padding-bottom:16px;scroll-snap-type:x proximity;align-items:flex-start}
-.col{flex:1 1 0;min-width:250px;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:10px;scroll-snap-align:start;min-height:180px;transition:background .15s}
+.col{flex:1 1 0;min-width:190px;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:10px;scroll-snap-align:start;min-height:180px;transition:background .15s}
 .col.drop{background:var(--accent-soft);border-color:var(--accent)}
 .colh{display:flex;align-items:center;gap:8px;padding:4px 4px 10px;font-weight:650;font-size:14px}
 .colh .cnt{margin-left:auto;color:var(--muted);font-weight:600;font-size:12.5px;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:0 7px}
@@ -286,7 +286,8 @@ const DEFAULT_RATES={astana:{teacher:10,tech:20,sales:10},almaty:{teacher:25,tec
 const RATE_HINTS={astana:{teacher:'обычно 10%',tech:'20% (или 10% для второго тех специалиста)'},almaty:{teacher:'25% (или 10%)',tech:'обычно 25%'},shymkent:{teacher:'обычно 10%',tech:'обычно 25%'}};
 const DEFAULT_STATUSES=[
   {id:'bron',name:'Бронь',color:'#7DCB8E'},
-  {id:'process',name:'Дата выбрана',color:'#E9B949'},
+  {id:'offered',name:'Дата предложена',color:'#F08C2E'},
+  {id:'process',name:'Дата утверждена',color:'#E9B949'},
   {id:'retake',name:'Пересдача',color:'#A08CD8'},
   {id:'closed',name:'Закрытая сделка',color:'#0F766E'}];
 const LEGACY_STATUS={excellent:'closed',refund:'closed'};
@@ -471,7 +472,7 @@ const S={db:null,user:null,uid:null,ownerAcc:false,canWrite:true,route:'',
   an:{city:'all',mode:'month',period:'',month:'',from:'',to:'',series:'decade'},
   pay:{period:'',open:{}},exp:{month:'',city:''},staff:{show:'active'},charts:[]};
 
-function cfg(){const c=S.config||{};return {statuses:(c.statusesV===2&&c.statuses&&c.statuses.length)?c.statuses:DEFAULT_STATUSES,accrual:c.accrual||'exam',rules:c.rules||[],sessionMin:300}}
+function cfg(){const c=S.config||{};return {statuses:(c.statusesV===3&&c.statuses&&c.statuses.length)?c.statuses:DEFAULT_STATUSES,accrual:c.accrual||'exam',rules:c.rules||[],sessionMin:300}}
 function statusById(id){const st=cfg().statuses;id=LEGACY_STATUS[id]||id;return st.find(s=>s.id===id)||st[0]}
 function closedOutcome(c){if(c.closed&&c.closed.outcome)return c.closed.outcome;if(c.status==='excellent')return 'good';if(c.status==='refund')return 'bad';return ''}
 function emp(id){return S.emps[id]}
@@ -661,14 +662,16 @@ function kcard(c,s,own,me,showCity){
   const mine=me?(r.byEmp[me.id]||0):0;
   return `<div class="kcard" draggable="${S.canWrite}" data-cid="${c.id}" style="--sc:${s.color}">
     <div class="nm"><span>${esc(c.name||'Без имени')}</span><span class="badge">${esc(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||'')}</span></div>
-    <div class="meta">${showCity?esc(CITY_NAME[c.city]||'')+' · ':''}${c.examDate?'Экзамен: '+dshow(c.examDate)+(c.examTime?' '+c.examTime:''):(statusById(c.status).id==='bron'?'<span class="muted">Дата не выбрана</span>':'<span style="color:var(--warn);font-weight:600">Дата пока не выбрана</span>')}<br>
+    <div class="meta">${showCity?esc(CITY_NAME[c.city]||'')+' · ':''}${c.examDate?'Экзамен: '+dshow(c.examDate)+(c.examTime?' '+c.examTime:'')+'<br>':(statusById(c.status).id==='bron'?'<span class="muted">Дата не выбрана</span><br>':statusById(c.status).id==='offered'?'':'<span style="color:var(--warn);font-weight:600">Дата пока не выбрана</span><br>')}
     ${c.level||c.target||c.deadline?'Уровень '+esc(c.level||'—')+' → '+esc(c.target||'—')+(c.deadline?' · дедлайн '+dshow(c.deadline):'')+'<br>':''}
     ${closedOutcome(c)?(closedOutcome(c)==='good'?'<span style="color:var(--ok);font-weight:600">Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):'')+'</span><br>':'<span style="color:var(--danger);font-weight:600">Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':'')+'</span>'+(c.closed&&(c.closed.reasons||[]).length?'<br>Причина: '+c.closed.reasons.map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', '):'')+'<br>'):''}
     ${c.retake?'<span style="font-weight:600">Пересдача '+(c.retake.kind==='paid'?'платная'+(c.retake.fee?' +'+money(c.retake.fee):''):c.retake.kind==='free'?'бесплатная':c.retake.kind==='expense'?'расходная'+(c.retake.fee?' −'+money(c.retake.fee):''):'')+'</span>'+(c.retake.date?' · '+dshow(c.retake.date)+(c.retake.time?' '+c.retake.time:''):' · дата не выбрана')+'<br>':''}
+    ${statusById(c.status).id==='offered'?(offerExpired(c)?'<span style="color:var(--danger);font-weight:600">Время истекло — вернётся в бронь</span><br>':'<span style="color:'+OFFER_COLOR+';font-weight:600">Предложено вариантов: '+(c.offers||[]).length+' · до '+holdLabel(c.offerExpires)+'</span><br>'):''}
+    ${c.offerExpiredAt&&statusById(c.status).id==='bron'?'<span class="muted">Не подтвердил предложенную дату</span><br>':''}
     ${num(c.refund)?'<span style="color:var(--danger);font-weight:600">Возврат '+money(c.refund)+(c.refundMode==='pct'&&c.refundPct!==''?' ('+c.refundPct+'%)':'')+'</span><br>':''}
     ${money(r.cost)} · ${planOf(c)==='100'?'оплата 100%':planOf(c)==='custom'?'оплачено '+r.pct+'%':'оплата '+planOf(c)}<br>
     Продал: ${esc(empName(c.soldBy))}<br>
-    ${statusById(c.status).id!=='bron'?'Связка: '+esc(empName(c.techId))+' + '+esc(empName(c.teacherId))+(c.address?'<br>Адрес: '+esc(c.address):''):''}</div>
+    ${!['bron','offered'].includes(statusById(c.status).id)?'Связка: '+esc(empName(c.techId))+' + '+esc(empName(c.teacherId))+(c.address?'<br>Адрес: '+esc(c.address):''):''}</div>
     ${own?`<div class="tot"><span class="small muted">Итого Vanguard</span><b>${money(r.vanguard)}</b></div>`:(mine?`<div class="tot"><span class="small muted">Ваша доля</span><b>${money(mine)}</b></div>`:'')}
   </div>`;
 }
@@ -719,11 +722,11 @@ function openClient(id,copy,presetStatus){
   if(!F.refundMode)F.refundMode='sum';
   F.payPlan=planOf(F);F.payParts=partsOf(F);if(F.payPlan!=='custom')F.paidPct=pctFromParts(F.payPlan,F.payParts);
   F._orig=src?{teacherId:src.teacherId,techId:src.techId,soldBy:src.soldBy,city:src.city,status:src.status}:null;
-  if(copy){F.id=null;F.name=(F.name||'')+' (копия)';F.history=[];F.archived=false;F._orig=null;F._copy=true;F.slotId='';F.sess=null;F.sessionId='';F.dateMode='tbd';F.examDate='';F.examTime='';F.retake=null}
+  if(copy){F.id=null;F.name=(F.name||'')+' (копия)';F.history=[];F.archived=false;F._orig=null;F._copy=true;F.slotId='';F.sess=null;F.sessionId='';F.dateMode='tbd';F.examDate='';F.examTime='';F.retake=null;F.offers=[];F.offerExpires=''}
   openModal('<div id="cf"></div>',{cls:'wide',onClose:()=>{F=null}});
   if(presetStatus)setFormStatus(presetStatus);
   drawClientForm();
-  if(presetStatus)setTimeout(()=>{const el=presetStatus==='process'?$('#dateblock'):presetStatus==='bron'?$('#c-level'):$('#statusblock');if(el)el.scrollIntoView({block:'center'})},50);
+  if(presetStatus)setTimeout(()=>{const el=presetStatus==='offered'?$('#offerblock'):presetStatus==='process'?$('#dateblock'):presetStatus==='bron'?$('#c-level'):$('#statusblock');if(el)el.scrollIntoView({block:'center'})},50);
 }
 /* роли игрока по городам */
 function rolesIn(e,city){
@@ -744,7 +747,11 @@ function seg(name,opts,val){return `<div class="seg" data-seg="${name}">${opts.m
 /* ---- связки: учитель + тех специалист ---- */
 function slotOwner(s){return s&&s.clientId&&S.clients[s.clientId]&&!S.clients[s.clientId].deleted?s.clientId:''}
 function partIds(x){return x.type==='session'?[x.techId,x.teacherId]:[x.playerId]}
-function sessLive(x){return x&&!x.deleted&&x.type==='session'&&x.clientId&&S.clients[x.clientId]&&!S.clients[x.clientId].deleted}
+const HOLD_HOURS=12,OFFER_COLOR='#F08C2E';
+function sessLive(x){if(!(x&&!x.deleted&&x.type==='session'&&x.clientId&&S.clients[x.clientId]&&!S.clients[x.clientId].deleted))return false;
+  if(x.bookKind==='offer'){const c=S.clients[x.clientId];return !!x.expiresAt&&x.expiresAt>nowIso()&&statusById(c.status).id==='offered'}return true}
+function holdLabel(iso){if(!iso)return '';const d=new Date(iso);return pad(d.getHours())+':'+pad(d.getMinutes())+(isoOf(d)===today()?' сегодня':isoOf(d)===addDays(today(),1)?' завтра':' '+dshow(isoOf(d)).slice(0,5))}
+function offerExpired(c){return statusById(c.status).id==='offered'&&c.offerExpires&&c.offerExpires<=nowIso()}
 function busyOf(pid,date,excl){
   return liveSched().filter(x=>x.date===date&&partIds(x).includes(pid)&&(
     (x.type==='session'&&sessLive(x)&&x.clientId!==excl)||(x.type==='slot'&&slotOwner(x)&&slotOwner(x)!==excl)||(x.type!=='slot'&&x.type!=='session')))
@@ -775,7 +782,8 @@ function pairName(o){return empName(o.techId)+' + '+empName(o.teacherId)}
 function optLabel(o){if(!o)return '';const wd=WD[(new Date(o.date+'T00:00:00').getDay()+6)%7];return wd+', '+dshow(o.date).slice(0,5)+' · '+o.start+'–'+fromMin(toMin(o.start)+num(o.dur))+' · '+pairName(o)}
 const PICK={};
 function pairPicker(key){
-  const cur=key==='main'?F.sess:(F.retake&&F.retake.sess);
+  const cur=key==='main'?F.sess:key==='offer'?null:(F.retake&&F.retake.sess);
+  const inOffers=o=>key==='offer'&&(F.offers||[]).some(x=>sameOpt(x,o));
   const fT=F.techId,fU=F.teacherId;
   let list=pairOptions(F.city,F.id,today(),addDays(today(),35)).filter(o=>(!fT||o.techId===fT)&&(!fU||o.teacherId===fU));
   const prefT=fT,prefU=fU;
@@ -789,21 +797,48 @@ function pairPicker(key){
     arr.sort((a,b)=>(isPref(b[0])-isPref(a[0]))||a[0].start.localeCompare(b[0].start));
     return `<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)">
     <div class="small" style="width:78px;flex:none;font-weight:650;padding-top:6px">${WD[(new Date(d+'T00:00:00').getDay()+6)%7]}, ${dshow(d).slice(0,5)}</div>
-    <div class="row" style="gap:6px">${arr.slice(0,30).map(([o,i])=>`<button type="button" class="btn sm ${sameOpt(o,cur)?'pri':''}" data-slot-pick="${key}|${i}">${isPref(o)?'★ ':''}${o.start} · ${esc(pairName(o))}</button>`).join('')}${arr.length>30?`<span class="tiny muted">ещё ${arr.length-30}</span>`:''}</div></div>`}).join('')}</div>`;
+    <div class="row" style="gap:6px">${arr.slice(0,30).map(([o,i])=>`<button type="button" class="btn sm ${sameOpt(o,cur)||inOffers(o)?'pri':''}" data-slot-pick="${key}|${i}">${isPref(o)?'★ ':''}${o.start} · ${esc(pairName(o))}</button>`).join('')}${arr.length>30?`<span class="tiny muted">ещё ${arr.length-30}</span>`:''}</div></div>`}).join('')}</div>`;
 }
 function applyPick(key,i){
   const o=PICK[key]&&PICK[key][i];if(!o)return;
+  if(key==='offer'){F.offers=F.offers||[];const ix=F.offers.findIndex(x=>sameOpt(x,o));if(ix>=0)F.offers.splice(ix,1);else if(F.offers.length>=3){toast('Можно предложить не больше 3 вариантов');return}else F.offers.push({...o});return}
   if(key==='main'){F.sess={...o};F.examDate=o.date;F.examTime=o.start;
     if(F.techId!==o.techId){F.techId=o.techId;applyRates(['tech'])}
     if(F.teacherId!==o.teacherId){F.teacherId=o.teacherId;applyRates(['teacher'])}}
   else{F.retake.sess={...o};F.retake.date=o.date;F.retake.time=o.start}
+}
+function approveOffer(i){
+  const o=F.offers&&F.offers[i];if(!o)return;
+  F.sess={date:o.date,start:o.start,dur:o.dur,techId:o.techId,teacherId:o.teacherId};F.dateMode='slot';F.examDate=o.date;F.examTime=o.start;
+  if(F.techId!==o.techId){F.techId=o.techId;applyRates(['tech'])}
+  if(F.teacherId!==o.teacherId){F.teacherId=o.teacherId;applyRates(['teacher'])}
+  F.status='process';F._approvedFrom=F.offers.slice();F.offers=[];
+}
+function offerText(){
+  const exp=F.offerExpires&&F.offerExpires>nowIso()?F.offerExpires:new Date(Date.now()+HOLD_HOURS*3600e3).toISOString();
+  const ex=F.exam==='Другое'&&F.examOther?F.examOther:F.exam;
+  return `Здравствуйте${F.name?', '+F.name.split(' ')[0]:''}! Свободное время для экзамена ${ex}:\n`+(F.offers||[]).map((o,i)=>`${i+1}) ${WD[(new Date(o.date+'T00:00:00').getDay()+6)%7]}, ${dshow(o.date).slice(0,5)} в ${o.start}`).join('\n')+
+    `\n\nПожалуйста, подтвердите удобный вариант до ${holdLabel(exp)} — после этого время освободится для других клиентов.`;
+}
+function offerBlock(){
+  const offs=F.offers||[];const live=F.offerExpires&&F.offerExpires>nowIso();
+  return `<div class="card" id="offerblock" style="margin-bottom:16px;border-color:${OFFER_COLOR};padding:16px">
+    <div class="row"><b class="grow">Варианты для клиента (до 3)</b><span class="chip" style="border-color:${OFFER_COLOR}">${live?'держится до '+holdLabel(F.offerExpires):'будет держаться '+HOLD_HOURS+' ч после сохранения'}</span></div>
+    <div class="small muted" style="margin:6px 0 10px">Выбранное время держится за этим клиентом ${HOLD_HOURS} часов — другим клиентам его не предложат. Клиент подтвердил — нажмите «Утвердить». Не ответил за ${HOLD_HOURS} ч — время освободится само, карточка вернётся в «Бронь».</div>
+    ${offs.length?`<div style="display:flex;flex-direction:column;gap:6px">${offs.map((o,i)=>`<div class="row" style="padding:8px 10px;border:1px solid var(--line);border-radius:10px"><b>${i+1}.</b><span class="grow">${esc(optLabel(o))}</span>
+      <button type="button" class="btn sm pri" data-approve="${i}">Утвердить</button><button type="button" class="btn sm ghost" data-unoffer="${i}">✕</button></div>`).join('')}</div>
+      <div class="row" style="margin-top:10px"><button type="button" class="btn sm" data-act="copyOffer">Скопировать для клиента</button><span class="tiny muted">текст с вариантами для WhatsApp</span></div>`
+      :'<div class="small" style="color:var(--warn)">Выберите от 1 до 3 вариантов ниже.</div>'}
+    <div style="margin-top:12px"><label class="lbl">Свободные связки</label>${pairPicker('offer')}</div>
+  </div>`;
 }
 function dateBlock(key){
   const isMain=key==='main';const r=F.retake||{};
   const mode=isMain?F.dateMode:r.dateMode;const sess=isMain?F.sess:r.sess;
   const legacy=isMain&&F.slotId&&S.sched[F.slotId]?S.sched[F.slotId]:null;
   const date=isMain?F.examDate:r.date,time=isMain?F.examTime:r.time;
-  return `${seg(isMain?'dmode':'rdmode',[{id:'slot',name:'По связкам'},{id:'manual',name:'Вручную'},{id:'tbd',name:'Пока не выбрана'}],mode)}
+  const prevOffers=isMain&&!sess&&(F.offers||[]).length?`<div class="info" style="margin-bottom:10px"><b>Клиенту предлагали:</b>${F.offers.map((o,i)=>`<div class="row" style="margin-top:6px"><span class="grow">${esc(optLabel(o))}</span><button type="button" class="btn sm pri" data-approve="${i}">Утвердить</button></div>`).join('')}</div>`:'';
+  return `${prevOffers}${seg(isMain?'dmode':'rdmode',[{id:'slot',name:'По связкам'},{id:'manual',name:'Вручную'},{id:'tbd',name:'Пока не выбрана'}],mode)}
    ${mode==='slot'?(sess?`<div class="row" style="margin-top:10px"><span class="chip acc" style="font-size:14px;padding:6px 12px">Выбрано: ${esc(optLabel(sess))}</span><button type="button" class="btn sm" data-slot-clear="${key}">Сменить</button></div>`
       :legacy?`<div class="row" style="margin-top:10px"><span class="chip acc" style="font-size:14px;padding:6px 12px">Слот: ${esc(dshow(legacy.date))} ${legacy.start} · ${esc(empName(legacy.playerId))}</span><button type="button" class="btn sm" data-slot-clear="${key}">Сменить</button></div>`
       :pairPicker(key)):''}
@@ -820,9 +855,10 @@ async function syncSession(oldId,sess,cid,kind){
   await setDoc(BASE+'/schedule/'+nid,{type:'session',date:sess.date,start:sess.start,dur:num(sess.dur)||cfg().sessionMin,city:sess.city||c.city||'',techId:sess.techId,teacherId:sess.teacherId,clientId:cid,bookKind:kind,deleted:false,createdAt:nowIso(),createdBy:S.uid||''});
   return nid;
 }
-const STATUS_HINT={bron:'Клиент оплатил бронь. Дату пока не выбираем — заполните уровень, целевой балл и дедлайн.',process:'Выберите дату и время из свободных связок (тех специалист + учитель).',retake:'Отправляем на пересдачу — выберите вид и дату ниже.',closed:'Сделка закрыта — заполните фидбэк ниже.'};
+const STATUS_HINT={offered:'Предложите клиенту до 3 вариантов времени — они держатся за ним '+HOLD_HOURS+' часов.',bron:'Клиент оплатил бронь. Дату пока не выбираем — заполните уровень, целевой балл и дедлайн.',process:'Дата подтверждена клиентом — выберите или утвердите время связки.',retake:'Отправляем на пересдачу — выберите вид и дату ниже.',closed:'Сделка закрыта — заполните фидбэк ниже.'};
 function setFormStatus(v){
   F.status=v;
+  if(v==='offered'&&!F.offers)F.offers=[];
   if(v==='process'&&F.dateMode==='tbd')F.dateMode='slot';
   if(v==='retake'&&!F.retake)F.retake={kind:'free',fee:'',comment:'',dateMode:'slot',slotId:'',date:'',time:''};
   if(v==='closed'&&!F.closed)F.closed={outcome:'',score:'',result:'',attempts:F.retake?'2':'1',refundType:'',comment:''};
@@ -870,8 +906,9 @@ function drawClientForm(){
       <div class="field"><label class="lbl">Нужный балл</label><input class="input" id="c-target" value="${esc(c.target||'')}" placeholder="напр. IELTS 6.5 / TOEFL 90"></div>
       <div class="field"><label class="lbl">Дедлайн сдачи</label><input type="date" class="input" id="c-deadline" value="${esc(c.deadline||'')}"></div>
     </div>
-    ${c.status!=='bron'?`<div class="field" id="dateblock"><label class="lbl">Дата экзамена ${c.status==='process'?'<span style="color:var(--danger)">*</span>':''}</label>${dateBlock('main')}</div>`
-      :(c.examDate?`<div class="small muted" style="margin:-6px 0 14px">Назначена дата: ${dshow(c.examDate)} ${esc(c.examTime||'')} — при статусе «Бронь» она сохранится.</div>`:'')}
+    ${c.status==='offered'?offerBlock():''}
+    ${c.status!=='bron'&&c.status!=='offered'?`<div class="field" id="dateblock"><label class="lbl">Дата экзамена ${c.status==='process'?'<span style="color:var(--danger)">*</span>':''}</label>${dateBlock('main')}</div>`
+      :(c.status==='bron'&&c.examDate?`<div class="small muted" style="margin:-6px 0 14px">Назначена дата: ${dshow(c.examDate)} ${esc(c.examTime||'')} — при статусе «Бронь» она сохранится.</div>`:'')}
     ${c.status==='process'?`<div class="field"><label class="lbl">Адрес клиента</label><input class="input" id="c-address" value="${esc(c.address||'')}" placeholder="Улица, дом, квартира / ориентир"></div>`:''}
     <div id="statusblock">
     ${c.status==='retake'?`<div class="card" style="margin-bottom:16px;border-color:${statusById('retake').color};padding:16px">
@@ -979,6 +1016,10 @@ function bindClientForm(box){
     else if(k==='refmode'){F.refundMode=v;if(v==='pct'){if(F.refundPct==='')F.refundPct=gross(F)?Math.round(num(F.refund)/gross(F)*100):100;recalcRefund()}}
     else F[k]=v;
     drawClientForm()});
+  $$('[data-approve]',box).forEach(b=>b.onclick=()=>{approveOffer(Number(b.dataset.approve));drawClientForm();toast('Время утверждено — нажмите «Сохранить»')});
+  $$('[data-unoffer]',box).forEach(b=>b.onclick=()=>{F.offers.splice(Number(b.dataset.unoffer),1);drawClientForm()});
+  const co=$('[data-act="copyOffer"]',box);if(co)co.onclick=async()=>{const t=offerText();try{await navigator.clipboard.writeText(t);toast('Текст скопирован')}catch(e){
+    const m=openModal(`<div class="mh"><h2>Текст для клиента</h2><button class="iconbtn" data-x>✕</button></div><div class="mb"><textarea class="input" rows="8" readonly>${esc(t)}</textarea><div class="tiny muted" style="margin-top:6px">Выделите и скопируйте.</div></div>`,{cls:'narrow'});m.querySelector('[data-x]').onclick=()=>closeModal();m.querySelector('textarea').select()}};
   $$('[data-slot-pick]',box).forEach(b=>b.onclick=()=>{const [key,i]=b.dataset.slotPick.split('|');applyPick(key,Number(i));drawClientForm()});
   $$('[data-slot-clear]',box).forEach(b=>b.onclick=()=>{const key=b.dataset.slotClear;if(key==='main'){F.slotId='';F.sess=null;F.examDate='';F.examTime=''}else{F.retake.slotId='';F.retake.sess=null;F.retake.date='';F.retake.time=''}drawClientForm()});
   const txt={'c-name':'name','c-address':'address','c-level':'level','c-target':'target','c-deadline':'deadline','c-examOther':'examOther','c-payDate':'payDate','c-comment':'comment','c-refundComment':'refundComment'};
@@ -1018,7 +1059,11 @@ async function saveClient(){
   if(!c.soldBy){toast('Укажите, кто продал');const el=$('#c-soldBy');if(el){el.focus();el.scrollIntoView({block:'center'})}return}
   const need=(cond,msg,id)=>{if(cond){toast(msg);const el=id&&$('#'+id);if(el){el.focus();el.scrollIntoView({block:'center'})}return true}return false};
   if(c.status==='bron'&&(need(!String(c.level||'').trim(),'Укажите уровень клиента','c-level')||need(!String(c.target||'').trim(),'Укажите, сколько баллов нужно','c-target')||need(!c.deadline,'Укажите дедлайн сдачи','c-deadline')))return;
-  if(c.status==='process'&&!(c.dateMode==='slot'?c.sess||c.slotId:c.dateMode==='manual'&&c.examDate)){toast('Для «Дата выбрана» выберите дату и время');const el=$('#dateblock');if(el)el.scrollIntoView({block:'center'});return}
+  if(c.status==='offered'&&!(c.offers||[]).length){toast('Выберите хотя бы один вариант времени для клиента');const el=$('#offerblock');if(el)el.scrollIntoView({block:'center'});return}
+  if(c.status==='offered'){
+    for(const o of c.offers){const keep=((S.clients[c.id]||{}).offers||[]).some(x=>sameOpt(x,o)&&x.sessionId&&S.sched[x.sessionId]&&sessLive(S.sched[x.sessionId]));
+      const a=toMin(o.start),b=a+num(o.dur);if(!keep&&!(freeAt(o.techId,c.city,o.date,a,b,c.id||'_new')&&freeAt(o.teacherId,c.city,o.date,a,b,c.id||'_new'))){toast('Вариант '+optLabel(o)+' уже занят — уберите его');return}}}
+  if(c.status==='process'&&!(c.dateMode==='slot'?c.sess||c.slotId:c.dateMode==='manual'&&c.examDate)){toast('Для «Дата утверждена» выберите дату и время');const el=$('#dateblock');if(el)el.scrollIntoView({block:'center'});return}
   if(c.status==='retake'&&(!c.retake||!['paid','free','expense'].includes(c.retake.kind))){toast('Выберите вид пересдачи');return}
   if(c.retake&&c.retake.kind==='expense'&&!num(c.retake.fee)){toast('Укажите стоимость расходной пересдачи');$('#rt-fee')&&$('#rt-fee').focus();return}
   if(c.status==='closed'){const cl=c.closed||{};
@@ -1043,6 +1088,7 @@ async function saveClient(){
     refund:Math.round(num(c.refund)),refundMode:c.refundMode||'sum',refundPct:c.refundMode==='pct'?num(c.refundPct):'',refundComment:c.closed&&c.closed.outcome==='bad'?String(c.closed.comment||'').trim():String(c.refundComment||'').trim(),
     expense:Math.round(num(c.expense)),comment:String(c.comment||'').trim(),
     level:String(c.level||'').trim(),target:String(c.target||'').trim(),deadline:c.deadline||'',
+    offers:[],offerExpires:'',
     closed:c.closed?{outcome:c.closed.outcome||'',score:c.closed.outcome==='good'?String(c.closed.score||'').trim():'',result:c.closed.outcome==='good'?String(c.closed.result||'').trim():'',attempts:c.closed.outcome==='good'?String(c.closed.attempts||'').trim():'',
       reasons:c.closed.outcome==='bad'?(c.closed.reasons||[]):[],refundType:c.closed.outcome==='bad'?c.closed.refundType:'',comment:String(c.closed.comment||'').trim()}:null,
     rates:{teacher:num(c.rates.teacher),tech:num(c.rates.tech),sales:c.soldBy==='self'?0:num(c.rates.sales),extras:(c.rates.extras||[]).map(x=>({empId:x.empId,pct:num(x.pct),ruleId:x.ruleId||null}))},
@@ -1058,6 +1104,18 @@ async function saveClient(){
   data.history=[...((old&&old.history)||[]),{at:nowIso(),by:S.uid||'',action}].slice(-60);
   closeModal();
   try{
+    const oldOffers=(old&&old.offers)||[];
+    if(data.status==='offered'){
+      const same=oldOffers.length===c.offers.length&&c.offers.every(o=>oldOffers.some(x=>sameOpt(x,o)&&x.sessionId&&S.sched[x.sessionId]&&sessLive(S.sched[x.sessionId])));
+      if(same){data.offers=oldOffers;data.offerExpires=old.offerExpires}
+      else{const exp=new Date(Date.now()+HOLD_HOURS*3600e3).toISOString();
+        for(const x of oldOffers)if(x.sessionId&&S.sched[x.sessionId]&&!S.sched[x.sessionId].deleted)await updDoc(BASE+'/schedule/'+x.sessionId,{deleted:true});
+        const list=[];for(const o of c.offers){const nid=newId('schedule');
+          await setDoc(BASE+'/schedule/'+nid,{type:'session',date:o.date,start:o.start,dur:num(o.dur)||cfg().sessionMin,city:data.city,techId:o.techId,teacherId:o.teacherId,clientId:id,bookKind:'offer',expiresAt:exp,deleted:false,createdAt:nowIso(),createdBy:S.uid||''});
+          list.push({date:o.date,start:o.start,dur:num(o.dur)||cfg().sessionMin,techId:o.techId,teacherId:o.teacherId,sessionId:nid})}
+        data.offers=list;data.offerExpires=exp;
+        data.history.push({at:nowIso(),by:S.uid||'',action:'предложено вариантов: '+list.length+' (держится до '+holdLabel(exp)+')'})}
+    }else{for(const x of oldOffers)if(x.sessionId&&S.sched[x.sessionId]&&!S.sched[x.sessionId].deleted)await updDoc(BASE+'/schedule/'+x.sessionId,{deleted:true})}
     data.sessionId=await syncSession(old&&old.sessionId,mainSess&&{...mainSess,city:data.city},id,'exam');
     if(rt)rt.sessionId=await syncSession(old&&old.retake&&old.retake.sessionId,rtSess&&{...rtSess,city:data.city},id,'retake');
     else if(old&&old.retake&&old.retake.sessionId)await syncSession(old.retake.sessionId,null,id,'retake');
@@ -1074,7 +1132,7 @@ async function syncSlot(oldId,newId_,cid,kind){
 }
 async function setClientStatus(id,status){
   const c=S.clients[id];if(!c||c.status===status)return;
-  if(status==='retake'||status==='closed'||(status==='process'&&!c.examDate)||(status==='bron'&&!(c.level&&c.target&&c.deadline))){openClient(id,false,status);return}
+  if(status==='offered'||status==='retake'||status==='closed'||(status==='process'&&!c.examDate)||(status==='bron'&&!(c.level&&c.target&&c.deadline))){openClient(id,false,status);return}
   const hist=[...(c.history||[]),{at:nowIso(),by:S.uid||'',action:'статус → '+statusById(status).name}].slice(-60);
   try{await updDoc(BASE+'/clients/'+id,{status,updatedAt:nowIso(),updatedBy:S.uid||'',history:hist})}catch(e){}
 }
@@ -1455,7 +1513,7 @@ function openExp(id){
 }
 
 /* ===== НАСТРОЙКИ ===== */
-function saveConfig(patch){const c={...cfg(),...patch};return setDoc(BASE+'/config/app',{statuses:c.statuses,statusesV:2,accrual:c.accrual,rules:c.rules,sessionMin:c.sessionMin,updatedAt:nowIso()})}
+function saveConfig(patch){const c={...cfg(),...patch};return setDoc(BASE+'/config/app',{statuses:c.statuses,statusesV:3,accrual:c.accrual,rules:c.rules,sessionMin:c.sessionMin,updatedAt:nowIso()})}
 function viewSettings(){
   const c=cfg();
   const viewers=Object.keys(S.viewers);resolveNames(viewers);
@@ -1612,6 +1670,8 @@ function buildItems(from,to,pf){
   const all=liveSched();const items=[];
   all.filter(x=>x.date>=from&&x.date<=to&&pf.ev(x)).forEach(x=>{
     const end=fromMin(toMin(x.start)+num(x.dur||60));
+    if(x.type==='session'&&x.bookKind==='offer'){if(!sessLive(x))return;const c=S.clients[x.clientId];
+      items.push({kind:'session',id:x.id,date:x.date,start:x.start,end,free:true,color:OFFER_COLOR,type:'Предложено · держится до '+holdLabel(x.expiresAt),title:c.name,who:pairName(x),city:x.city,conf:false});return}
     if(x.type==='session'){if(!sessLive(x))return;const c=S.clients[x.clientId];
       items.push({kind:'session',id:x.id,date:x.date,start:x.start,end,color:x.bookKind==='retake'?RETAKE_COLOR:EXAM_COLOR,
         type:x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||''),title:c.name,who:pairName(x),city:x.city,conf:false,comment:c.address?'Адрес: '+c.address:''});return}
@@ -1709,6 +1769,7 @@ function openSlot(id){
 /* запись на связку */
 function openSession(id){
   const x=S.sched[id];if(!sessLive(x))return;const c=S.clients[x.clientId];const me=myEmp();
+  if(x.bookKind==='offer'){openClient(c.id);return}
   const canEdit=S.canWrite&&(isOwner()||(me&&partIds(x).includes(me.id)));
   const m=openModal(`<div class="mh"><h2>${x.bookKind==='retake'?'Пересдача':'Экзамен'}: ${esc(c.name)}</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
     <div class="kpis" style="grid-template-columns:1fr 1fr;margin-bottom:12px"><div class="kpi"><div class="k">Когда</div><div class="v" style="font-size:18px">${WD[(new Date(x.date+'T00:00:00').getDay()+6)%7]}, ${dshow(x.date)}<br>${x.start}–${fromMin(toMin(x.start)+num(x.dur))}</div></div>
@@ -1833,7 +1894,7 @@ function viewSchedule(){
     return `<div class="day ${d===td?'today':''}"><div class="dayh"><span>${WD[i]}</span><b>${Number(d.slice(8))}</b></div><div class="dayb">${its.map(it=>evHtml(it,!f.city)).join('')}
       ${S.canWrite?`<div class="row" style="gap:4px;margin-top:auto"><button class="add" style="flex:1;margin:0" data-addq="${d}">+ клиент</button><button class="add" style="flex:1;margin:0" data-addslot="${d}">+ слот</button></div>`:''}</div></div>`}).join('');
   return tb+`<div class="week">${days}</div>
-    <div class="row small muted" style="margin-top:12px;gap:16px"><span class="row" style="gap:6px"><span class="dot" style="background:${SLOT_FREE}"></span>Свободное время</span><span class="row" style="gap:6px"><span class="dot" style="background:${EXAM_COLOR}"></span>Экзамен клиента</span><span class="row" style="gap:6px"><span class="dot" style="background:${RETAKE_COLOR}"></span>Пересдача</span></div>`;
+    <div class="row small muted" style="margin-top:12px;gap:16px"><span class="row" style="gap:6px"><span class="dot" style="background:${SLOT_FREE}"></span>Свободное время</span><span class="row" style="gap:6px"><span class="dot" style="background:${EXAM_COLOR}"></span>Экзамен клиента</span><span class="row" style="gap:6px"><span class="dot" style="background:${RETAKE_COLOR}"></span>Пересдача</span><span class="row" style="gap:6px"><span class="dot" style="background:${OFFER_COLOR}"></span>Предложено (держится ${HOLD_HOURS} ч)</span></div>`;
 }
 let EV=null;
 function openEvent(id,date){
@@ -2082,8 +2143,20 @@ function afterData(){
     if(!v)setDoc(BASE+'/viewers/'+S.uid,{firstSeen:nowIso(),lastSeen:d,login}).catch(()=>{});
     else if(v.lastSeen!==d||v.login!==login)updDoc(BASE+'/viewers/'+S.uid,{lastSeen:d,login}).catch(()=>{})}
   autoLink();
+  expireOffers();
   setTimeout(maybeFreeze,1500);
 }
+const expiring=new Set();
+async function expireOffers(){
+  if(!S.canWrite||!S.fresh.clients)return;
+  for(const c of liveClients().filter(offerExpired)){
+    if(expiring.has(c.id))continue;expiring.add(c.id);
+    try{for(const x of c.offers||[])if(x.sessionId&&S.sched[x.sessionId]&&!S.sched[x.sessionId].deleted)await updDoc(BASE+'/schedule/'+x.sessionId,{deleted:true});
+      await updDoc(BASE+'/clients/'+c.id,{status:'bron',offers:[],offerExpires:'',offerExpiredAt:nowIso(),
+        history:[...(c.history||[]),{at:nowIso(),by:'',action:'клиент не подтвердил дату за '+HOLD_HOURS+' ч — варианты освобождены, карточка вернулась в «Бронь»'}].slice(-60)})}catch(e){}
+  }
+}
+setInterval(()=>{if(S.db){expireOffers();if(S.route&&document.visibilityState==='visible'&&!modalStack.length)schedule()}},60000);
 /* Привязка аккаунта к игроку по email */
 const linkTried=new Set();
 function autoLink(){
