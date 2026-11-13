@@ -387,8 +387,8 @@ function corrections(frozen,current){
 <script>
 let SB=null;
 /* ===== Подключение к Supabase (вставьте свои значения) ===== */
-const SUPABASE_URL='__SUPABASE_URL__';
-const SUPABASE_ANON_KEY='__SUPABASE_ANON_KEY__';
+const SUPABASE_URL='https://sozofzzcipkeibzbkwzd.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_7dg54XKG3XXTHfUrjC2CmQ_VjVN9CqI';
 const LOGIN_DOMAIN='vanguard.app';
 function loginToEmail(l){l=String(l||'').trim().toLowerCase();if(!l)return '';if(l.includes('@'))return l;const d=l.replace(/[^\d]/g,'');return (d.length>=6?d:l.replace(/[^a-z0-9._-]/g,''))+'@'+LOGIN_DOMAIN}
 function emailToLogin(e){e=String(e||'');return e.endsWith('@'+LOGIN_DOMAIN)?e.slice(0,-(LOGIN_DOMAIN.length+1)):e}
