@@ -277,7 +277,7 @@ body:before{content:"";position:fixed;inset:0;z-index:-1;background:linear-gradi
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 14:10</div>
+    <div class="tiny muted" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 14:15</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -725,7 +725,7 @@ function planOf(c){if(c.payPlan&&(PAY_PLANS[c.payPlan]||c.payPlan==='custom'))re
 function partsOf(c){const pl=planOf(c);if(pl==='custom')return [];const n=PAY_PLANS[pl].length;if(Array.isArray(c.payParts)&&c.payParts.length===n)return c.payParts.slice();
   if(pl==='100')return [true];if(c.paidMode==='50')return [true,false];return PAY_PLANS[pl].map((_,i)=>i===0)}
 function pctFromParts(pl,parts){return 100}
-const EXAM_ICON={'TOEFL iBT':'assets/exam-toefl.png','Duolingo':'assets/exam-duolingo.png','IELTS':''};
+const EXAM_ICON={'TOEFL iBT':'assets/exam-toefl.png','Duolingo':'assets/exam-duolingo.png','IELTS':'assets/exam-ielts.png'};
 function examIcon(ex,size){const u=EXAM_ICON[ex];return u?`<img src="${u}" alt="" style="width:${size||14}px;height:${size||14}px;vertical-align:-2px;margin-right:5px">`:''}
 function examLabel(c){const n=c.exam==='Другое'&&c.examOther?c.examOther:(c.exam||'');return examIcon(c.exam)+esc(n)}
 function blankClient(city){
