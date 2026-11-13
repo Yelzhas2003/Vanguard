@@ -259,7 +259,7 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
   <aside class="side" id="side">
     <div class="logo"><i>V</i><div>Vanguard<small>CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 13:10</div>
+    <div class="tiny muted" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 13:15</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1402,6 +1402,13 @@ function stats(city,rng){
   Object.values(S.expenses).filter(x=>!x.deleted&&x.date>=rng.start&&x.date<=rng.end&&(city==='all'||x.city===city)).forEach(x=>s.gexp+=num(x.amount));
   s.net=s.vanguard-s.gexp;
   let ex=0,rf=0;cl.forEach(c=>{const o=closedOutcome(c);if(o==='good')ex++;else if(o==='bad')rf++});s.success=ex+rf?Math.round(ex/(ex+rf)*100):null;
+  s.good=ex;s.badN=rf;
+  s.bad=cl.filter(c=>closedOutcome(c)==='bad');
+  s.reasons={internet:0,late:0,none:0};s.full=0;s.partial=0;s.fullSum=0;s.partialSum=0;s.badByEmp={};s.badByCity={};
+  s.bad.forEach(c=>{const cl_=c.closed||{};const rs=cl_.reasons||[];if(!rs.length)s.reasons.none++;rs.forEach(r=>s.reasons[r]=(s.reasons[r]||0)+1);
+    const amt=Math.round(num(c.refund));if(cl_.refundType==='full'||(!cl_.refundType&&c.status==='refund'&&amt>=calcClient({...c,refund:0}).paid)){s.full++;s.fullSum+=amt}else{s.partial++;s.partialSum+=amt}
+    [c.teacherId,c.techId].filter(Boolean).forEach(id=>s.badByEmp[id]=(s.badByEmp[id]||0)+1);s.badByCity[c.city]=(s.badByCity[c.city]||0)+1});
+  s.lostRevenue=s.fullSum+s.partialSum;
   return s;
 }
 function viewAnalytics(){
@@ -1428,7 +1435,22 @@ function viewAnalytics(){
     <div class="chartbox"><h3>Топ игроков по заработку</h3><div class="small muted">За выбранный период</div><div class="cv"><canvas id="ch-emp"></canvas></div></div>
     <div class="chartbox"><h3>Экзамены</h3><div class="small muted">Количество клиентов</div><div class="cv"><canvas id="ch-exam"></canvas></div></div>
     <div class="chartbox"><h3>Воронка статусов</h3><div class="small muted">Доля успешных = довольные ÷ все закрытые сделки${s.success===null?'':': <b>'+s.success+'%</b>'}</div><div class="cv"><canvas id="ch-status"></canvas></div></div>
-  </div>`;
+  </div>
+  <div class="sectiontitle" style="margin-top:32px">Возвраты и недовольные клиенты</div>
+  <div class="kpis">
+    ${k('Закрыто сделок',nfmt(s.good+s.badN))}${k('Довольны',nfmt(s.good)+(s.good+s.badN?' · '+Math.round(s.good/(s.good+s.badN)*100)+'%':''))}
+    ${k('Недовольны',nfmt(s.badN)+(s.good+s.badN?' · '+Math.round(s.badN/(s.good+s.badN)*100)+'%':''))}
+    ${k('Вернули клиентам',money(s.lostRevenue))}${k('Полных возвратов',nfmt(s.full)+' · '+money(s.fullSum))}${k('Частичных возвратов',nfmt(s.partial)+' · '+money(s.partialSum))}
+  </div>
+  ${s.badN?`<div class="charts">
+    <div class="chartbox"><h3>Причины</h3><div class="small muted">Почему не получилось сдать</div><div class="cv" style="height:200px"><canvas id="ch-reasons"></canvas></div></div>
+    <div class="chartbox"><h3>Недовольные по игрокам</h3><div class="small muted">В каких связках были недовольные клиенты (учитель или тех специалист)</div><div class="cv" style="height:200px"><canvas id="ch-badEmp"></canvas></div></div>
+  </div>
+  <div class="tablewrap" style="margin-top:12px"><table class="t"><thead><tr><th>Клиент</th><th>Город</th><th>Экзамен</th><th>Связка</th><th>Возврат</th><th class="r">Сумма</th><th>Причина</th><th>Комментарий</th></tr></thead><tbody>
+    ${s.bad.sort((x,y)=>String(y.updatedAt||'').localeCompare(String(x.updatedAt||''))).map(c=>{const cl_=c.closed||{};const rs=(cl_.reasons||[]).map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', ');
+      return `<tr class="click" data-cid="${c.id}"><td><b>${esc(c.name)}</b></td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${esc(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||'')}</td><td>${esc(empName(c.techId))} + ${esc(empName(c.teacherId))}</td>
+        <td>${cl_.refundType==='full'?'полный':cl_.refundType==='partial'?'частичный':'—'}</td><td class="r">${nfmt(c.refund)}</td><td>${esc(rs||'—')}</td><td style="white-space:normal;min-width:180px">${esc(cl_.comment||c.refundComment||'')}</td></tr>`}).join('')}
+  </tbody></table></div>`:'<div class="card empty"><b>Недовольных клиентов за этот период нет</b>Здесь появятся возвраты, причины и связки, если клиент закрыт как «недоволен».</div>'}`;
 }
 let chartLoading=null;
 function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
@@ -1473,6 +1495,10 @@ function drawAnalytics(){
     const co=chartOpts(true,true);co.scales.x.ticks.callback=v=>v;co.scales.x.ticks.precision=0;
     if(el('ch-exam'))S.charts.push(new Chart(el('ch-exam'),{type:'bar',data:{labels:EXAMS,datasets:[{label:'Клиентов',isCount:true,data:exams,backgroundColor:c3,borderRadius:4,maxBarThickness:22}]},options:co}));
     const st=cfg().statuses;const co2=chartOpts(true,true);co2.scales.x.ticks.callback=v=>v;co2.scales.x.ticks.precision=0;
+    const coR=chartOpts(true,true);coR.scales.x.ticks.callback=v=>v;coR.scales.x.ticks.precision=0;
+    if(el('ch-reasons'))S.charts.push(new Chart(el('ch-reasons'),{type:'bar',data:{labels:['Проблемы с интернетом','Опоздание','Без причины'],datasets:[{label:'Клиентов',isCount:true,data:[s.reasons.internet||0,s.reasons.late||0,s.reasons.none||0],backgroundColor:c2,borderRadius:4,maxBarThickness:22}]},options:coR}));
+    const be=Object.entries(s.badByEmp).sort((x,y)=>y[1]-x[1]).slice(0,8);const coE=chartOpts(true,true);coE.scales.x.ticks.callback=v=>v;coE.scales.x.ticks.precision=0;
+    if(el('ch-badEmp'))S.charts.push(new Chart(el('ch-badEmp'),{type:'bar',data:{labels:be.map(([id])=>empName(id)),datasets:[{label:'Недовольных',isCount:true,data:be.map(x=>x[1]),backgroundColor:c2,borderRadius:4,maxBarThickness:22}]},options:coE}));
     if(el('ch-status'))S.charts.push(new Chart(el('ch-status'),{type:'bar',data:{labels:st.map(x=>x.name),datasets:[{label:'Клиентов',isCount:true,data:st.map(x=>s.byStatus[x.id]||0),backgroundColor:st.map(x=>x.color),borderRadius:4,maxBarThickness:22}]},options:co2}));
   });
 }
