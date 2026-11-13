@@ -36,7 +36,7 @@ button{cursor:pointer}
 a{color:var(--accent);text-decoration:none}
 svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .app{display:flex;min-height:100vh}
-.side{width:232px;flex:none;padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column}
+.side{width:200px;flex:none;padding:18px 12px;position:sticky;top:0;height:100vh;overflow:auto;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column}
 .logo{font-weight:700;font-size:17px;letter-spacing:-.01em;padding:4px 10px 18px;display:flex;align-items:center;gap:10px}
 .logo i{width:28px;height:28px;border-radius:7px;background:var(--accent);display:inline-grid;place-items:center;color:var(--card);font-style:normal;font-size:14px;font-weight:800}
 .logo small{display:block;font-size:12px;font-weight:500;color:var(--muted);letter-spacing:0}
@@ -254,11 +254,11 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
 .side{background:#111A2B!important;border-right:0!important;color:#C7D0DE}
 :root[data-theme="dark"] .side{background:rgba(8,9,11,.86)!important;border-right:1px solid var(--line)!important}
 .side .logo{color:#fff;padding:6px 10px 22px}
-.side .logo small{color:#8D99AE;font-size:10.5px;white-space:nowrap}
+.side .logo small{color:#8D99AE;font-size:10.5px;white-space:normal;line-height:1.25}
 .logo i.lg{background:transparent!important;box-shadow:none!important;width:34px;height:34px}
 .logo i.lg img{width:30px}
 .logo i.lg{flex:none!important;min-width:34px}
-.side .nav a{color:#B4BFCF;font-size:15px;padding:10px 12px}
+.side .nav a{color:#B4BFCF;font-size:14px;padding:9px 10px}
 .side .nav a:hover{background:rgba(255,255,255,.06);color:#fff}
 .side .nav a.on{background:rgba(255,255,255,.09);color:#fff;box-shadow:inset 3px 0 0 #5B8DEF}
 .side .nav .grp{color:#6E7B91}
@@ -282,10 +282,10 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
 .app.mini .side:not(:hover) .nl,.app.mini .side:not(:hover) .grp,.app.mini .side:not(:hover) .logo>div,.app.mini .side:not(:hover) .ver{display:none}
 .app.mini .side:not(:hover) .nav a{justify-content:center;padding:10px 0}
 .app.mini .side:not(:hover) .nav{margin-top:6px}
-.app.mini .side:hover{width:240px;box-shadow:10px 0 34px rgba(0,0,0,.28)}
+.app.mini .side:hover{width:200px;box-shadow:10px 0 34px rgba(0,0,0,.28)}
 .side .nav a,.side .logo{white-space:nowrap}
 .main{transition:margin-left .18s ease}
-@media (min-width:861px){.app.mini:has(.side:hover) .main{margin-left:240px}.app.mini .side:hover{box-shadow:none}}
+@media (min-width:861px){.app.mini:has(.side:hover) .main{margin-left:200px}.app.mini .side:hover{box-shadow:none}}
 :root[data-theme="dark"] .side{background:#F4F6FA!important;border-right:0!important;color:#1A2233;box-shadow:0 0 30px rgba(255,255,255,.08)}
 :root[data-theme="dark"] .side .logo{color:#0E1320}
 :root[data-theme="dark"] .side .logo small{color:#5D687A}
@@ -324,7 +324,7 @@ table.t{border-collapse:collapse;width:100%;font-size:14px}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 15:20</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 15:30</div>
   </aside>
   <div class="main">
     <header class="top">
