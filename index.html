@@ -363,6 +363,10 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
 .mb-avawrap:hover .mb-cam{transform:scale(1.12)}
 .mb-avawrap:hover .mb-ava{filter:brightness(.85)}
 .mb-rm{font-size:11.5px;color:rgba(255,255,255,.6)!important;text-decoration:underline;display:inline-block;margin-top:6px}
+
+:root{--prio:#B7791F}:root[data-theme="dark"]{--prio:#F5C451}
+.btn.prio{border-color:var(--prio)!important;box-shadow:inset 0 0 0 1px var(--prio);font-weight:650}
+.btn.prio:not(.pri){background:color-mix(in srgb,var(--prio) 10%,var(--card))}
 </style>
 </head>
 <body>
@@ -370,7 +374,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 14.11 · 21:15</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 14.11 · 21:45</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -591,7 +595,7 @@ const S={db:null,user:null,uid:null,ownerAcc:false,canWrite:true,route:'',
   an:{city:'all',mode:'month',period:'',month:'',from:'',to:'',series:'decade'},
   pay:{period:'',open:{}},exp:{month:'',city:''},staff:{show:'active'},charts:[],leads:{},ld:{q:'',city:'',seller:''},sl:{city:'all',mode:'month',month:''}};
 
-function cfg(){const c=S.config||{};return {retakeSplit:c.retakeSplit||{},statuses:(c.statusesV===4&&c.statuses&&c.statuses.length)?c.statuses:DEFAULT_STATUSES,accrual:c.accrual||'exam',rules:c.rules||[],sessionMin:300}}
+function cfg(){const c=S.config||{};return {priority:c.priority||null,retakeSplit:c.retakeSplit||{},statuses:(c.statusesV===4&&c.statuses&&c.statuses.length)?c.statuses:DEFAULT_STATUSES,accrual:c.accrual||'exam',rules:c.rules||[],sessionMin:300}}
 function statusById(id){const st=cfg().statuses;id=LEGACY_STATUS[id]||id;return st.find(s=>s.id===id)||st[0]}
 function closedOutcome(c){if(c.closed&&c.closed.outcome)return c.closed.outcome;if(c.status==='excellent')return 'good';if(c.status==='refund')return 'bad';return ''}
 function emp(id){return S.emps[id]}
@@ -939,6 +943,10 @@ function pairOptions(city,excl,from,to){
   return out.sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
 }
 function sameOpt(a,b){return a&&b&&a.date===b.date&&a.start===b.start&&a.techId===b.techId&&a.teacherId===b.teacherId}
+const PRIO_DEFAULT={astana:{teacher:'Перизат',tech:'Арсен'},almaty:{teacher:'Нурбек',tech:''},shymkent:{teacher:'Нурбек',tech:''}};
+function prioOf(city){const p=cfg().priority;if(p&&p[city])return p[city];const d=PRIO_DEFAULT[city]||{};const byName=n=>{if(!n)return '';const e=liveEmps().find(x=>x.active!==false&&(x.name||'').trim().toLowerCase()===n.toLowerCase());return e?e.id:''};
+  return {teacher:byName(d.teacher),tech:byName(d.tech)}}
+function prioScore(o,city){const p=prioOf(city);return (p.teacher&&o.teacherId===p.teacher?2:0)+(p.tech&&o.techId===p.tech?1:0)}
 function pairName(o){return empName(o.techId)+' + '+empName(o.teacherId)}
 function optLabel(o){if(!o)return '';const wd=WD[(new Date(o.date+'T00:00:00').getDay()+6)%7];return wd+', '+dshow(o.date).slice(0,5)+' · '+o.start+'–'+fromMin(toMin(o.start)+num(o.dur))+' · '+pairName(o)}
 const PICK={};
@@ -948,17 +956,17 @@ function pairPicker(key){
   const fT=F.techId,fU=F.teacherId;
   let list=pairOptions(F.city,F.id,today(),addDays(today(),35)).filter(o=>(!fT||o.techId===fT)&&(!fU||o.teacherId===fU));
   const prefT=fT,prefU=fU;
-  const isPref=o=>false;
+  const isPref=o=>prioScore(o,F.city);const P=prioOf(F.city);const st=id=>id&&(id===P.teacher||id===P.tech)?'★ ':'';
   PICK[key]=list;
   if(!list.length&&(fT||fU))return `<div class="info" style="margin-top:8px">У ${esc([fT?empName(fT):'',fU?empName(fU):''].filter(Boolean).join(' + '))} нет общего свободного времени на ${cfg().sessionMin/60} ч в ближайшие 5 недель. Выберите «— любой —» или другого игрока.</div>`;
   if(!list.length)return `<div class="info" style="margin-top:8px">В городе ${esc(CITY_NAME[F.city])} нет совпадений: тех специалист и учитель должны оба быть свободны ${cfg().sessionMin/60} ч подряд. Игроки добавляют слоты в «Моём кабинете» или в «Расписании» → «+ Добавить слот».</div>`;
   const byDate={};list.forEach((o,i)=>(byDate[o.date]=byDate[o.date]||[]).push([o,i]));
-  return `<div class="tiny muted" style="margin-top:8px">${fT&&fU?'Показано время только связки '+esc(pairName({techId:fT,teacherId:fU})):fT?'Тех специалист '+esc(empName(fT))+' со всеми учителями':fU?'Учитель '+esc(empName(fU))+' со всеми тех специалистами':'Все возможные связки города'} — меняется полями «Учитель» и «Тех специалист» выше.</div>
+  return `<div class="tiny muted" style="margin-top:8px">${fT&&fU?'Показано время только связки '+esc(pairName({techId:fT,teacherId:fU})):fT?'Тех специалист '+esc(empName(fT))+' со всеми учителями':fU?'Учитель '+esc(empName(fU))+' со всеми тех специалистами':'Все возможные связки города'} — меняется полями «Учитель» и «Тех специалист» выше.${P.teacher||P.tech?` <span style="color:var(--prio)">★ — приоритет в ${esc(CITY_NAME[F.city])}: ${esc([P.teacher?empName(P.teacher):'',P.tech?empName(P.tech):''].filter(Boolean).join(', '))}</span>`:''}</div>
   <div style="margin-top:8px;max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:4px 10px">${Object.entries(byDate).map(([d,arr])=>{
-    arr.sort((a,b)=>(isPref(b[0])-isPref(a[0]))||a[0].start.localeCompare(b[0].start));
+    arr.sort((a,b)=>a[0].start.localeCompare(b[0].start)||(isPref(b[0])-isPref(a[0])));
     return `<div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)">
     <div class="small" style="width:78px;flex:none;font-weight:650;padding-top:6px">${WD[(new Date(d+'T00:00:00').getDay()+6)%7]}, ${dshow(d).slice(0,5)}</div>
-    <div class="row" style="gap:6px">${arr.slice(0,30).map(([o,i])=>`<button type="button" class="btn sm ${sameOpt(o,cur)||inOffers(o)?'pri':''}" data-slot-pick="${key}|${i}">${isPref(o)?'★ ':''}${o.start} · ${esc(pairName(o))}</button>`).join('')}${arr.length>30?`<span class="tiny muted">ещё ${arr.length-30}</span>`:''}</div></div>`}).join('')}</div>`;
+    <div class="row" style="gap:6px">${arr.slice(0,30).map(([o,i])=>`<button type="button" class="btn sm ${sameOpt(o,cur)||inOffers(o)?'pri':''} ${isPref(o)?'prio':''}" data-slot-pick="${key}|${i}" ${isPref(o)?'title="Приоритетная связка"':''}>${o.start} · ${st(o.techId)}${esc(empName(o.techId))} + ${st(o.teacherId)}${esc(empName(o.teacherId))}</button>`).join('')}${arr.length>30?`<span class="tiny muted">ещё ${arr.length-30}</span>`:''}</div></div>`}).join('')}</div>`;
 }
 function applyPick(key,i){
   const o=PICK[key]&&PICK[key][i];if(!o)return;
@@ -1906,7 +1914,9 @@ function bindLeads(v){
 }
 
 /* ===== НАСТРОЙКИ ===== */
-function saveConfig(patch){const c={...cfg(),...patch};return setDoc(BASE+'/config/app',{statuses:c.statuses,statusesV:4,accrual:c.accrual,rules:c.rules,sessionMin:c.sessionMin,retakeSplit:c.retakeSplit||{},updatedAt:nowIso()})}
+function saveConfig(patch){const c={...cfg(),...patch};return setDoc(BASE+'/config/app',{statuses:c.statuses,statusesV:4,accrual:c.accrual,rules:c.rules,sessionMin:c.sessionMin,retakeSplit:c.retakeSplit||{},priority:c.priority||null,updatedAt:nowIso()})}
+document.addEventListener('change',e=>{const el=e.target.closest&&e.target.closest('[data-prio]');if(!el||!isOwner())return;const [city,role]=el.dataset.prio.split('|');
+  const pr={};CITIES.forEach(c=>pr[c.id]={...prioOf(c.id)});pr[city][role]=el.value;saveConfig({priority:pr}).then(()=>toast('Приоритет сохранён'))});
 function viewSettings(){
   const c=cfg();
   const viewers=Object.keys(S.viewers);resolveNames(viewers);
@@ -1918,6 +1928,12 @@ function viewSettings(){
     ${seg('accrual',[{id:'exam',name:'По дате экзамена'},{id:'payment',name:'По дате брони'}],c.accrual)}
     <p class="small muted">Определяет, в какой период клиент попадает в аналитике. Выплаты игрокам всегда считаются только по закрытым сделкам — по дате закрытия.</p></div>
 
+  <div class="card" style="margin-top:16px"><div class="sectiontitle" style="margin-top:0">Приоритет в связках</div>
+    <p class="small muted">Приоритетные игроки отмечаются ★ и выделяются при выборе связки. Остальные тоже доступны, если свободны.</p>
+    <div class="list">${CITIES.map(ct=>{const p=prioOf(ct.id);const opts=(role,sel)=>'<option value="">— нет —</option>'+liveEmps().filter(e=>e.active!==false&&hasRole(e,ct.id,role)).map(e=>`<option value="${e.id}" ${sel===e.id?'selected':''}>${esc(e.name)}</option>`).join('');
+      return `<div class="item" style="gap:14px;flex-wrap:wrap"><b style="width:90px">${ct.name}</b>
+      <label class="small" style="display:flex;align-items:center;gap:6px">Учитель <select class="select" data-prio="${ct.id}|teacher" style="width:auto;min-height:32px" ${isOwner()?'':'disabled'}>${opts('teacher',p.teacher)}</select></label>
+      <label class="small" style="display:flex;align-items:center;gap:6px">Тех специалист <select class="select" data-prio="${ct.id}|tech" style="width:auto;min-height:32px" ${isOwner()?'':'disabled'}>${opts('tech',p.tech)}</select></label></div>`}).join('')}</div></div>
   <div class="card" style="margin-top:16px"><div class="row"><div class="sectiontitle grow" style="margin:0">Правила-доплаты</div><button class="btn pri" data-act="newRule">+ Правило</button></div>
     <p class="small muted">«Если учитель (или тех специалист) = X в выбранных городах, то дополнительно Y получает N% от выручки клиента». Подставляется в анкету при выборе игрока и фиксируется при сохранении.</p>
     <div class="list">${c.rules.filter(r=>!r.deleted).map(r=>`<div class="item"><span class="grow">${ruleText(r)}</span>
