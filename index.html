@@ -367,6 +367,9 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
 :root{--prio:#B7791F}:root[data-theme="dark"]{--prio:#F5C451}
 .btn.prio{border-color:var(--prio)!important;box-shadow:inset 0 0 0 1px var(--prio);font-weight:650}
 .btn.prio:not(.pri){background:color-mix(in srgb,var(--prio) 10%,var(--card))}
+
+.ev .arr{font-size:11.5px;color:var(--prio);font-weight:600}
+.mb-arr{margin-top:8px;font-size:13px;background:rgba(245,196,81,.18);border:1px solid rgba(245,196,81,.55);color:#FFE7A8;border-radius:8px;padding:6px 10px}
 </style>
 </head>
 <body>
@@ -374,7 +377,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 14.11 · 23:55</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 00:30</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -923,8 +926,13 @@ function busyOf(pid,date,excl){
     .map(x=>[toMin(x.start),toMin(x.start)+num(x.dur||60)]);
 }
 function windowsOf(pid,city,date){return liveSched().filter(x=>x.type==='slot'&&x.playerId===pid&&x.date===date&&!slotOwner(x))}
+const ARRIVE_MIN=90;
+function inWindow(pid,date,a){const prev=addDays(date,-1);
+  return liveSched().some(w=>w.type==='slot'&&w.playerId===pid&&!slotOwner(w)&&(w.date===date||w.date===prev)&&(()=>{const off=w.date===prev?-1440:0;const ws=toMin(w.start)+off,we=ws+num(w.dur);return ws<=a&&a<=we})())}
+function busyNear(pid,date,excl){const out=[];[-1,0,1].forEach(k=>{const d=addDays(date,k);busyOf(pid,d,excl).forEach(([x,y])=>out.push([x+k*1440,y+k*1440]))});return out}
 function freeAt(pid,city,date,a,b,excl){
-  return windowsOf(pid,city,date).some(w=>toMin(w.start)<=a&&toMin(w.start)+num(w.dur)>=b)&&!busyOf(pid,date,excl).some(([x,y])=>x<b&&y>a);
+  const L=cfg().sessionMin;
+  return inWindow(pid,date,a)&&!busyNear(pid,date,excl).some(([x])=>Math.abs(x-a)<L);
 }
 function pairOptions(city,excl,from,to){
   const L=cfg().sessionMin;const td=today();const nm=new Date().getHours()*60+new Date().getMinutes();
@@ -933,12 +941,13 @@ function pairOptions(city,excl,from,to){
   const out=[];const seen=new Set();
   liveSched().filter(w=>w.type==='slot'&&w.date>=from&&w.date<=to&&!slotOwner(w)&&techs.some(t=>t.id===w.playerId)).forEach(w=>{
     const ws=toMin(w.start),we=ws+num(w.dur);
-    for(let t=ws;t+L<=we;t+=60){
-      if(w.date===td&&t<=nm)continue;
-      if(!freeAt(w.playerId,city,w.date,t,t+L,excl))continue;
-      teachers.forEach(tc=>{if(tc.id===w.playerId||!freeAt(tc.id,city,w.date,t,t+L,excl))return;
-        const k=w.date+'|'+t+'|'+w.playerId+'|'+tc.id;if(seen.has(k))return;seen.add(k);
-        out.push({date:w.date,start:fromMin(t),dur:L,techId:w.playerId,teacherId:tc.id})})}
+    for(let t0=ws;t0<=we;t0+=60){
+      const dd=t0>=1440?addDays(w.date,1):w.date,t=t0>=1440?t0-1440:t0;
+      if(dd>to||dd<td||(dd===td&&t<=nm))continue;
+      if(!freeAt(w.playerId,city,dd,t,t+L,excl))continue;
+      teachers.forEach(tc=>{if(tc.id===w.playerId||!freeAt(tc.id,city,dd,t,t+L,excl))return;
+        const k=dd+'|'+t+'|'+w.playerId+'|'+tc.id;if(seen.has(k))return;seen.add(k);
+        out.push({date:dd,start:fromMin(t),dur:L,techId:w.playerId,teacherId:tc.id})})}
   });
   return out.sort((a,b)=>(a.date+a.start).localeCompare(b.date+b.start));
 }
@@ -2037,7 +2046,7 @@ function viewMe(){
           <div class="mb-chips">${(me.roles||[]).filter(r=>r!=='owner').map(r=>`<span>${(ROLES.find(x=>x.id===r)||{}).name}</span>`).join('')}${(me.roles||[]).includes('owner')?'<span>Тренер</span>':''}</div>
           ${me.photo?'<a href="#" data-act="rmPhoto" class="mb-rm">убрать фото</a>':''}<div class="mb-sub">${[me.email?'Логин: '+esc(emailToLogin(me.email)):'',(me.cities||[]).map(c=>CITY_NAME[c]).join(', ')].filter(Boolean).join(' · ')}</div></div></div>
       <div class="mb-mid">${nextEv?`<div class="mb-lbl">${icon('cal')} Ближайшее</div><div class="mb-ev">${esc(nextEv.type||'Запись')}${nextEv.title?' · '+esc(nextEv.title):''}</div>
-          <div class="mb-evs">${WD[(new Date(nextEv.date+'T00:00:00').getDay()+6)%7]}, ${dshow(nextEv.date)}${nextEv.start?' · '+nextEv.start:''}${nextEv.city&&CITY_NAME[nextEv.city]?' · '+CITY_NAME[nextEv.city]:''}</div><div class="mb-cd">${cdown(nextEv)}</div>`
+          <div class="mb-evs">${WD[(new Date(nextEv.date+'T00:00:00').getDay()+6)%7]}, ${dshow(nextEv.date)}${nextEv.start?' · '+nextEv.start:''}${nextEv.city&&CITY_NAME[nextEv.city]?' · '+CITY_NAME[nextEv.city]:''}</div>${nextEv.arrive&&nextEv.techId===me.id?`<div class="mb-arr">⏰ Экзамен в ${nextEv.start} — будьте на месте в <b>${nextEv.arrive}</b></div>`:''}<div class="mb-cd">${cdown(nextEv)}</div>`
           :`<div class="mb-lbl">${icon('cal')} Ближайшее</div><div class="mb-ev">Записей пока нет</div><div class="mb-evs">Добавьте свободное время — вас предложат в связку</div>`}</div>
       <div class="mb-right"><div class="mb-lbl">${icon('wallet')} К выплате</div><div class="mb-big">${money(due)}</div>
         <div class="mb-evs">${pastDue>0?'ждёт выплаты '+money(pastDue)+' · ':''}за текущий период ${money(curDue)} — выплата ${dshow(curEnd).slice(0,5)}</div>
@@ -2100,7 +2109,7 @@ function buildItems(from,to,pf){
       items.push({kind:'session',id:x.id,date:x.date,start:x.start,end,free:true,color:OFFER_COLOR,type:'Предложено · держится до '+holdLabel(x.expiresAt),title:c.name,who:pairName(x),city:x.city,conf:false});return}
     if(x.type==='session'){if(!sessLive(x))return;const c=S.clients[x.clientId];
       items.push({kind:'session',id:x.id,date:x.date,start:x.start,end,color:x.bookKind==='retake'?RETAKE_COLOR:EXAM_COLOR,
-        type:x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||''),title:c.name,who:pairName(x),city:x.city,conf:false,comment:c.address?'Адрес: '+c.address:''});return}
+        type:x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||''),title:c.name,who:pairName(x),city:x.city,conf:false,comment:c.address?'Адрес: '+c.address:'',techId:x.techId,arrive:x.start?fromMin(toMin(x.start)-ARRIVE_MIN):''});return}
     if(x.type==='slot'){const cid=slotOwner(x);const c=cid?S.clients[cid]:null;
       if(!c&&pf.free===false)return;
       items.push({kind:'slot',id:x.id,date:x.date,start:x.start,end,free:!c,color:c?(x.bookKind==='retake'?RETAKE_COLOR:EXAM_COLOR):SLOT_FREE,
@@ -2136,7 +2145,8 @@ function openSlots(date,pid){
   const cityDef=S.sch.city||(me&&(me.cities||[])[0])||'astana';
   const X={city:cityDef,playerId:pid||(me?me.id:''),from:date||today(),to:date||addDays(today(),13),days:date?[(new Date(date+'T00:00:00').getDay()+6)%7]:[0,1,2,3,4],t1:'10:00',t2:'18:00'};
   openModal('<div id="slf"></div>',{});
-  const gen=()=>{const out=[];const a=toMin(X.t1),b=toMin(X.t2);if(!(b>a))return out;
+  const span=()=>{const a=toMin(X.t1);let b=toMin(X.t2);if(b<=a)b+=1440;return [a,b]};
+  const gen=()=>{const out=[];const [a,b]=span();if(!(b>a))return out;
     let d=X.from;let g=0;while(d<=X.to&&g++<120){if(X.days.includes((new Date(d+'T00:00:00').getDay()+6)%7)&&d>=today())out.push({date:d});d=addDays(d,1)}
     const exist=new Set(liveSched().filter(s=>s.type==='slot'&&s.playerId===X.playerId).map(s=>s.date+'|'+s.start+'|'+s.dur));
     return out.filter(o=>!exist.has(o.date+'|'+fromMin(a)+'|'+(b-a))).slice(0,120)};
@@ -2145,7 +2155,7 @@ function openSlots(date,pid){
     const players=liveEmps().filter(e=>e.active!==false&&(isRemote(e)||workCities(e).length));
     const P=emp(X.playerId);
     const roleTxt=e=>whereText(e);
-    const n=X.playerId?gen().length:0;const L=cfg().sessionMin;const len=toMin(X.t2)-toMin(X.t1);
+    const n=X.playerId?gen().length:0;const L=60;const len=span()[1]-span()[0];
     box.innerHTML=`<div class="mh"><h2>Добавить слот</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
       <p class="small muted" style="margin-top:0">Отметьте свободное время — своё или коллеги, один раз, без выбора города. Клиенту предлагается время, когда одновременно свободны тех специалист его города и учитель — минимум ${L/60} ч подряд.</p>
       <div class="field"><label class="lbl">Кто</label>${true?`<select class="select" id="sl-player"><option value="">— выберите игрока —</option>${players.map(e=>`<option value="${e.id}" ${X.playerId===e.id?'selected':''}>${esc(e.name)} · ${esc(roleTxt(e))}</option>`).join('')}</select>`:`<div><b>${esc(me?me.name:'')}</b> · ${esc(me?roleTxt(me):'')||'<span style="color:var(--warn)">нет роли учителя или тех специалиста</span>'}</div>`}</div>
@@ -2154,9 +2164,9 @@ function openSlots(date,pid){
       <div class="field"><label class="lbl">Дни недели</label><div class="seg" data-sdays>${WD.map((w,i)=>`<button type="button" data-v="${i}" class="${X.days.includes(i)?'on':''}">${w}</button>`).join('')}</div>
         <div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn sm" data-preset="wd">Будни</button><button type="button" class="btn sm" data-preset="we">Выходные</button><button type="button" class="btn sm" data-preset="all">Каждый день</button></div></div>
       <div class="field"><label class="lbl">Свободен(на) с — до</label><div class="row" style="flex-wrap:nowrap;max-width:320px"><input type="time" class="input" id="sl-t1" value="${X.t1}" step="1800"><span>—</span><input type="time" class="input" id="sl-t2" value="${X.t2}" step="1800"></div>
-        <div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn sm" data-tp="09:00|18:00">09–18</button><button type="button" class="btn sm" data-tp="18:00|23:00">Вечер 18–23</button><button type="button" class="btn sm" data-tp="09:00|22:00">Весь день</button></div></div>
-      <div class="${len<L?'note':'info'}">${!X.playerId?'Выберите игрока.':len<L?`Окно короче длительности записи (${L/60} ч) — в нём нельзя будет записать клиента.`:`Будет добавлено дней: <b>${n}</b>. Уже добавленные такие же окна пропускаются.`}</div>
-    </div><div class="mf"><button class="btn pri big" data-save ${n&&S.canWrite&&toMin(X.t2)>toMin(X.t1)?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button></div>`;
+        <div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn sm" data-tp="09:00|18:00">09–18</button><button type="button" class="btn sm" data-tp="18:00|23:00">Вечер 18–23</button><button type="button" class="btn sm" data-tp="08:00|01:00">Весь день 08–01</button></div></div>
+      <div class="${len<L?'note':'info'}">${!X.playerId?'Выберите игрока.':len<L?`Окно меньше часа.`:`Будет добавлено дней: <b>${n}</b>. Уже добавленные такие же окна пропускаются.`}</div>
+    </div><div class="mf"><button class="btn pri big" data-save ${n&&S.canWrite?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button></div>`;
     $$('[data-x]',box).forEach(b=>b.onclick=()=>closeModal());
     const scs=$('[data-seg="scity"]',box);if(scs)scs.onclick=e=>{const b=e.target.closest('button');if(!b)return;X.city=b.dataset.v;draw()};
     $('[data-sdays]',box).onclick=e=>{const b=e.target.closest('button');if(!b)return;const i=Number(b.dataset.v);X.days=X.days.includes(i)?X.days.filter(x=>x!==i):[...X.days,i];draw()};
@@ -2167,7 +2177,7 @@ function openSlots(date,pid){
     $('#sl-to',box).onchange=e=>{X.to=e.target.value;draw()};
     $('#sl-t1',box).onchange=e=>{X.t1=e.target.value;draw()};
     $('#sl-t2',box).onchange=e=>{X.t2=e.target.value;draw()};
-    $('[data-save]',box).onclick=async()=>{const list=gen();if(!list.length)return;closeModal();const a=toMin(X.t1),b=toMin(X.t2);
+    $('[data-save]',box).onclick=async()=>{const list=gen();if(!list.length)return;closeModal();const [a,b]=span();
       toast('Сохраняю: '+list.length+' дн.…');
       try{for(const o of list)await setDoc(BASE+'/schedule/'+newId('schedule'),{type:'slot',date:o.date,start:fromMin(a),dur:b-a,city:'all',playerId:X.playerId,clientId:'',bookKind:'',deleted:false,createdAt:nowIso(),createdBy:S.uid||''});
         toast('Слоты добавлены: '+list.length+' дн.')}catch(e){}};
@@ -2292,6 +2302,7 @@ function evHtml(it,showCity){
     <div>${it.start?`<span class="tm">${it.start}${it.end?'–'+it.end:''}</span> `:''}<span class="ty">${esc(it.type)}</span></div>
     ${it.title?`<div><b>${esc(it.title)}</b></div>`:''}
     <div class="who2">${esc([it.who,showCity?cityLabel(it.city):''].filter(Boolean).join(' · '))}</div>
+    ${it.arrive&&it.kind==='session'&&!it.free?`<div class="arr">Тех на месте: <b>${it.arrive}</b></div>`:''}
     ${it.conf?'<div style="color:var(--danger);font-weight:600">Пересечение по времени</div>':''}</div>`;
 }
 function viewSchedule(){
