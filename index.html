@@ -370,7 +370,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 13.11 · 17:50</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 14.11 · 21:05</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -2008,7 +2008,7 @@ function viewMe(){
   const potential=openMine.reduce((a,c)=>a+potOf(c),0);
   const lostCl=closed.filter(c=>lostOf(c)>0);const lost=lostCl.reduce((a,c)=>a+lostOf(c),0);
   const roleOf=c=>[c.teacherId===me.id?'учитель':'',c.techId===me.id?'тех':'',c.soldBy===me.id?'продажа':'',((c.rates&&c.rates.extras)||[]).some(x=>x.empId===me.id)?'доплата':''].filter(Boolean).join(', ');
-  const KI={'Ждёт выплаты':'wallet','Потенциальный заработок':'trend','Потеряно на возвратах':'undo','К выплате сейчас':'wallet','Текущий период':'clock','За этот месяц':'cal','Заработано за всё время':'coins','Мои клиенты':'users','Довольные клиенты':'smile','Записей на 2 недели':'cal','Свободно на неделе':'clock'};
+  const KI={'К выплате':'wallet','Ждёт выплаты':'wallet','Потенциальный заработок':'trend','Потеряно на возвратах':'undo','К выплате сейчас':'wallet','Текущий период':'clock','За этот месяц':'cal','Заработано за всё время':'coins','Мои клиенты':'users','Довольные клиенты':'smile','Записей на 2 недели':'cal','Свободно на неделе':'clock'};
   const k=(l,v,sub,h)=>kpi(KI[l]||(l.startsWith('Выплата')?'cal':''),l,v,{sub,hero:h});
   const hr=new Date().getHours();const hi=hr<12?'Доброе утро':hr<18?'Добрый день':'Добрый вечер';
   const now=new Date();const nowHM=pad(now.getHours())+':'+pad(now.getMinutes());
@@ -2027,8 +2027,8 @@ function viewMe(){
         <div class="mb-evs">${pastDue>0?'ждёт выплаты '+money(pastDue)+' · ':''}за текущий период ${money(curDue)} — выплата ${dshow(curEnd).slice(0,5)}</div>
         <div class="mb-btns"><button class="btn sm" data-act="myFree">+ Слот</button><button class="btn sm" data-act="goSched">Мои записи</button><a class="btn sm" href="#payouts">Мои выплаты</a></div></div>
     </div>
-    <div class="kpis">${k('Ждёт выплаты',money(pastDue),'за прошедшие периоды',true)}${k('Выплата '+dshow(curEnd).slice(0,5),money(curDue),'закрытые в '+periodLabel(cur))}${k('Потенциальный заработок',money(potential),openMine.length?'сделок в работе: '+openMine.length:'нет открытых сделок')}${k('Заработано за всё время',money(earnedAll),'выплачено '+money(paidAll))}${k('Потеряно на возвратах',lost?'<span style="color:var(--danger)">−'+money(lost)+'</span>':money(0),lostCl.length?'возвратов: '+lostCl.length:'возвратов нет')}</div>
-    <div class="kpis">${k('Текущий период',money(period),periodLabel(cur))}${k('За этот месяц',money(month),MONTHS[Number(ym.slice(5))-1])}${k('Мои клиенты',nfmt(allMine.length),'в работе '+inWork+' · закрыто '+closed.length)}${k('Довольные клиенты',sat===null?'—':sat+'%',good+bad?good+' из '+(good+bad)+' закрытых':'пока нет закрытых')}${k('Записей на 2 недели',nfmt(upcoming.length),'экзамены и пересдачи')}${k('Свободно на неделе',freeH+' ч',freeH?'':'добавьте слоты')}</div>
+    <div class="kpis">${k('К выплате',money(due),pastDue>0?'из них '+money(pastDue)+' за прошлые периоды':'ближайшая выплата '+dshow(curEnd).slice(0,5),true)}${k('Текущий период',money(period),periodLabel(cur))}${k('Потенциальный заработок',money(potential),openMine.length?'сделок в работе: '+openMine.length:'нет открытых сделок')}${k('Заработано за всё время',money(earnedAll),'выплачено '+money(paidAll))}${k('Потеряно на возвратах',lost?'<span style="color:var(--danger)">−'+money(lost)+'</span>':money(0),lostCl.length?'возвратов: '+lostCl.length:'возвратов нет')}</div>
+    <div class="kpis">${k('За этот месяц',money(month),MONTHS[Number(ym.slice(5))-1])}${k('Мои клиенты',nfmt(allMine.length),'в работе '+inWork+' · закрыто '+closed.length)}${k('Довольные клиенты',sat===null?'—':sat+'%',good+bad?good+' из '+(good+bad)+' закрытых':'пока нет закрытых')}${k('Записей на 2 недели',nfmt(upcoming.length),'экзамены и пересдачи')}${k('Свободно на неделе',freeH+' ч',freeH?'':'добавьте слоты')}</div>
     <div class="charts" style="grid-template-columns:repeat(auto-fit,minmax(380px,1fr))">
       <div class="chartbox"><div class="row"><h3 class="grow">Моё свободное время</h3><button class="btn sm pri" data-act="myFree">+ Добавить слот</button></div>
         ${freeW.length?`<div style="margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:340px;overflow:auto">${Object.entries(byDay).map(([d,ws])=>`<div class="row" style="gap:12px;flex-wrap:nowrap;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;${d===today()?'background:var(--accent-soft)':''}">
