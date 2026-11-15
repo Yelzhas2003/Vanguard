@@ -390,7 +390,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 02:45</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 03:00</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1803,13 +1803,24 @@ function liveLeads(){return Object.values(S.leads||{}).filter(x=>!x.deleted)}
 function leadSt(id){return LEAD_ST.find(s=>s.id===id)||LEAD_ST[0]}
 function leadDate(l){return String(l.createdAt||'').slice(0,10)}
 function daysAgo(iso){if(!iso)return '';const d=Math.floor((Date.now()-new Date(iso).getTime())/864e5);return d<=0?'сегодня':d===1?'вчера':d+' дн. назад'}
+function clientsWithoutLead(){const L=liveLeads();const names=new Set(L.map(l=>String(l.name||'').trim().toLowerCase()));const ids=new Set(L.map(l=>l.clientId).filter(Boolean));
+  return liveClients().filter(c=>!c.archived&&!ids.has(c.id)&&!names.has(String(c.name||'').trim().toLowerCase()))}
+async function importLeads(){const list=clientsWithoutLead();if(!list.length){toast('Все клиенты уже есть в лидах');return}
+  if(!await ask('Перенести клиентов в лиды?',`Будет создано лидов: <b>${list.length}</b> — сразу в «Получена бронь», источник WhatsApp, дата = дата брони клиента.<br><span class="muted small">${list.slice(0,12).map(c=>esc(c.name)).join(', ')}${list.length>12?' и ещё '+(list.length-12):''}</span>`,'Перенести',false))return;
+  toast('Переношу: '+list.length+'…');let n=0;
+  try{const byName={};liveClients().filter(c=>!c.archived).forEach(c=>byName[String(c.name||'').trim().toLowerCase()]=c);
+    for(const l of liveLeads())if(!l.clientId){const c=byName[String(l.name||'').trim().toLowerCase()];if(c&&!liveLeads().some(x=>x.clientId===c.id))await updDoc(BASE+'/leads/'+l.id,{clientId:c.id,status:'booked'})}
+    for(const c of list){const d=c.payDate?c.payDate+'T06:00:00.000Z':(c.createdAt||nowIso());
+    await setDoc(BASE+'/leads/'+newId('leads'),{name:c.name||'',phone:'',source:'WhatsApp',exam:c.exam||'',city:c.city||'',sellerId:c.soldBy&&c.soldBy!=='self'?c.soldBy:'',comment:'',status:'booked',statusAt:d,createdAt:d,clientId:c.id,imported:true,deleted:false,updatedAt:nowIso(),createdBy:S.uid||''});n++}
+    toast('Готово: лидов создано '+n)}catch(e){toast('Создано '+n+', остальные — ошибка, нажмите ещё раз')}}
 function viewLeads(){
   const L=S.ld;const all=liveLeads();
   const sellers=liveEmps().filter(e=>CITIES.some(c=>rolesIn(e,c.id).includes('sales'))||(e.roles||[]).includes('owner'));
   const q=L.q.trim().toLowerCase();
   const list=all.filter(l=>(!L.city||l.city===L.city)&&(!L.seller||l.sellerId===L.seller)&&(!q||String(l.name||'').toLowerCase().includes(q)||String(l.phone||'').includes(q)))
     .sort((a,b)=>String(b.statusAt||b.createdAt).localeCompare(a.statusAt||a.createdAt));
-  const tb=`<div class="toolbar"><button class="btn pri big" data-act="newLead">+ Добавить лид</button><div class="grow"></div>
+  const imp=isOwner()?clientsWithoutLead().length:0;
+  const tb=`<div class="toolbar"><button class="btn pri big" data-act="newLead">+ Добавить лид</button>${imp?`<button class="btn" data-act="importLeads" title="Создать лиды «Получена бронь» для клиентов, у которых ещё нет лида">Перенести клиентов в лиды (${imp})</button>`:''}<div class="grow"></div>
     <a class="btn sm" href="#sales">${icon('chart')} Аналитика продаж</a></div>
   <div class="toolbar"><input class="input" id="ld-q" placeholder="Поиск по имени или телефону…" value="${esc(L.q)}" style="min-width:220px">
     <select class="select" id="ld-city"><option value="">Все города</option>${CITIES.map(c=>`<option value="${c.id}" ${L.city===c.id?'selected':''}>${c.name}</option>`).join('')}</select>
@@ -2558,6 +2569,7 @@ function bindView(r){
     if(d.act==='payExport')return exportPayouts(d.fmt);
     if(d.act==='newExp')return openExp(null);
     if(d.act==='newLead')return openLead(null);
+    if(d.act==='importLeads')return importLeads();
     if(d.act==='clearLd'){S.ld={q:'',city:'',seller:''};return render()}
     if(d.act==='goSched'){S.sch.mine=true;location.hash='schedule';return}
     if(d.act==='clearExp'){S.exp={month:'',city:''};return render()}
