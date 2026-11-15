@@ -370,6 +370,15 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
 
 .ev .arr{font-size:11.5px;color:var(--prio);font-weight:600}
 .mb-arr{margin-top:8px;font-size:13px;background:rgba(245,196,81,.18);border:1px solid rgba(245,196,81,.55);color:#FFE7A8;border-radius:8px;padding:6px 10px}
+
+.kflags{display:flex;flex-wrap:wrap;gap:5px;margin:2px 0 6px}
+.kflag{font-size:12px;font-weight:650;color:var(--fc);background:color-mix(in srgb,var(--fc) 12%,transparent);border:1px solid color-mix(in srgb,var(--fc) 35%,transparent);padding:2px 8px;border-radius:999px;line-height:1.35}
+.kmore{flex:none;width:28px;height:28px;border-radius:50%;border:1px solid var(--line);background:var(--soft);color:var(--text2);display:grid;place-items:center;cursor:pointer;padding:0}
+.kmore .i{width:16px;height:16px;margin:0;transition:transform .15s}
+.kcard .tot{justify-content:space-between;gap:8px}.kcard .tot b{white-space:nowrap}
+.kmore:hover{color:var(--text)}
+.kcard .tot{align-items:center}
+.kcard .meta{margin-bottom:4px}
 </style>
 </head>
 <body>
@@ -377,7 +386,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 02:00</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 02:20</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -824,23 +833,36 @@ function viewBoard(city){
   }).join('');
   return tb+`<div class="board" id="board">${cols}</div>`;
 }
+function kflags(c,r){const st=statusById(c.status).id;const f=[];const F_=(col,t)=>f.push(`<span class="kflag" style="--fc:${col}">${t}</span>`);
+  if(st==='decide')F_('#E8743B','Под вопросом: '+esc(c.decideReason||'—'));
+  const o=closedOutcome(c);
+  if(o==='good')F_('var(--ok)','Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):''));
+  if(o==='bad')F_('var(--danger)','Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':''));
+  if(num(c.refund))F_('var(--danger)','Возврат '+money(c.refund));
+  if(c.retake&&st!=='closed')F_('#8B6FD6','Пересдача '+(c.retake.kind==='paid'?'платная':c.retake.kind==='free'?'бесплатная':'расходная')+(c.retake.date?' · '+dshow(c.retake.date).slice(0,5):' · без даты'));
+  if(st==='offered')F_(offerExpired(c)?'var(--danger)':'var(--warn)',offerExpired(c)?'Время истекло':'Предложено до '+holdLabel(c.offerExpires));
+  if((st==='process'||st==='decide')&&!c.examDate)F_('var(--warn)','Дата не выбрана');
+  if(c.offerExpiredAt&&st==='bron')F_('var(--muted)','Не подтвердил дату');
+  return f.length?`<div class="kflags">${f.join('')}</div>`:''}
 function kcard(c,s,own,me,showCity){
-  const r=calcClient(c);
-  const mine=me?(r.byEmp[me.id]||0):0;
-  return `<div class="kcard" draggable="${S.canWrite}" data-cid="${c.id}" style="--sc:${s.color}">
+  const r=calcClient(c);const open=!!(S.kopen&&S.kopen[c.id]);
+  return `<div class="kcard ${open?'open':''}" draggable="${S.canWrite}" data-cid="${c.id}" style="--sc:${s.color}">
     <div class="nm"><span>${esc(c.name||'Без имени')}</span><span class="badge" style="display:inline-flex;align-items:center">${examLabel(c)}</span></div>
+    ${kflags(c,r)}
+    ${open?`
     <div class="meta">${showCity?esc(CITY_NAME[c.city]||'')+' · ':''}${c.examDate?'Экзамен: '+dshow(c.examDate)+(c.examTime?' '+c.examTime:'')+'<br>':(statusById(c.status).id==='bron'?'<span class="muted">Дата не выбрана</span><br>':statusById(c.status).id==='offered'?'':'<span style="color:var(--warn);font-weight:600">Дата пока не выбрана</span><br>')}
     ${c.level||c.target||c.deadline?'Уровень '+esc(c.level||'—')+' → '+esc(c.target||'—')+(c.deadline?' · дедлайн '+dshow(c.deadline):'')+'<br>':''}
-    ${closedOutcome(c)?(closedOutcome(c)==='good'?'<span style="color:var(--ok);font-weight:600">Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):'')+'</span><br>':'<span style="color:var(--danger);font-weight:600">Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':'')+'</span>'+(c.closed&&(c.closed.reasons||[]).length?'<br>Причина: '+c.closed.reasons.map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', '):'')+'<br>'):''}
+    ${''?(closedOutcome(c)==='good'?'<span style="color:var(--ok);font-weight:600">Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):'')+'</span><br>':'<span style="color:var(--danger);font-weight:600">Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':'')+'</span>'+(c.closed&&(c.closed.reasons||[]).length?'<br>Причина: '+c.closed.reasons.map(r=>r==='internet'?'интернет':r==='late'?'опоздание':r).join(', '):'')+'<br>'):''}
     ${c.retake?'<span style="font-weight:600">Пересдача '+(c.retake.kind==='paid'?'платная'+(c.retake.fee?' +'+money(c.retake.fee):''):c.retake.kind==='free'?'бесплатная':c.retake.kind==='expense'?'расходная'+(c.retake.fee?' −'+money(c.retake.fee):''):'')+'</span>'+(c.retake.date?' · '+dshow(c.retake.date)+(c.retake.time?' '+c.retake.time:''):' · дата не выбрана')+'<br>':''}
     ${statusById(c.status).id==='offered'?(offerExpired(c)?'<span style="color:var(--danger);font-weight:600">Время истекло — вернётся в бронь</span><br>':'<span style="color:var(--warn);font-weight:600">Предложено вариантов: '+(c.offers||[]).length+' · до '+holdLabel(c.offerExpires)+'</span><br>'):''}
     ${c.offerExpiredAt&&statusById(c.status).id==='bron'?'<span class="muted">Не подтвердил предложенную дату</span><br>':''}
-    ${statusById(c.status).id==='decide'?'<span style="color:#E8743B;font-weight:600">Под вопросом: '+esc(c.decideReason||'—')+'</span><br>'+(c.decideNote?'<span class="muted">'+esc(c.decideNote)+'</span><br>':''):''}
-    ${num(c.refund)?'<span style="color:var(--danger);font-weight:600">Возврат '+money(c.refund)+(c.refundMode==='pct'&&c.refundPct!==''?' ('+c.refundPct+'%)':'')+'</span><br>':''}
+    ${statusById(c.status).id==='decide'?''+(c.decideNote?'<span class="muted">'+esc(c.decideNote)+'</span><br>':''):''}
+    ${num(c.refund)&&c.refundComment?'<span class="muted">Возврат: '+esc(c.refundComment)+'</span><br>':''}
     ${planOf(c)==='100'?'оплата 100%':planOf(c)==='custom'?'оплачено '+r.pct+'%':'оплата '+planOf(c)}<br>
     Продал: ${esc(empName(c.soldBy))}<br>
     ${!['bron','offered'].includes(statusById(c.status).id)?'Связка: '+esc(empName(c.techId))+' + '+esc(empName(c.teacherId))+(c.address?'<br>Адрес: '+esc(c.address):''):''}</div>
-    <div class="tot"><span class="small muted">Сумма</span><b>${money(r.cost)}</b></div>
+`:''}
+    <div class="tot"><b>${money(r.cost)}</b><button type="button" class="kmore" data-ktoggle="${c.id}" title="${open?'Свернуть':'Подробнее'}" aria-label="${open?'Свернуть':'Подробнее'}"><svg class="i" viewBox="0 0 24 24" style="transform:rotate(${open?180:0}deg)"><path d="m6 9 6 6 6-6"/></svg></button></div>
   </div>`;
 }
 function clientRows(list){
@@ -2506,6 +2528,8 @@ function bindView(r){
   v.onclick=async e=>{
     if((r==='schedule'||r==='me')&&schedClick(e))return;
     if(e.target.closest('[data-act="myFree"]')){const m=myEmp();openSlots(null,m&&m.id);return}
+    const kt=e.target.closest('[data-ktoggle]');if(kt){e.stopPropagation();const id=kt.dataset.ktoggle;S.kopen=S.kopen||{};S.kopen[id]=!S.kopen[id];const card=kt.closest('.kcard');const c=S.clients[id];
+      if(card&&c){card.outerHTML=kcard(c,statusById(c.status),isOwner(),myEmp(),S.route==='all')}return}
     const t=e.target.closest('[data-act],[data-mode],[data-cid],[data-emp-edit],[data-emp-del],[data-emp-card],[data-staff],[data-pay],[data-pay-open],[data-unpay],[data-anmode],[data-anser],[data-exp],[data-rule-edit],[data-rule-del],[data-st-up],[data-st-del],[data-seg] button');
     if(!t)return;const d=t.dataset;
     if(d.unpay!==undefined){e.preventDefault();e.stopPropagation();return unpay(S.pay.period,d.unpay,Number(d.i))}
