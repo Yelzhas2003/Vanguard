@@ -377,7 +377,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 01:50</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 02:00</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -817,9 +817,9 @@ function viewBoard(city){
   if(S.mode==='table')return tb+clientTable(list,own,me);
   const cols=st.map(s=>{
     const items=list.filter(c=>(statusById(c.status).id)===s.id);
-    const sum=items.reduce((a,c)=>a+(own?calcClient(c).vanguard:calcClient(c).cost),0);
+    const sum=items.reduce((a,c)=>a+calcClient(c).cost,0);
     return `<div class="col" data-col="${s.id}"><div class="colh"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}<span class="cnt">${items.length}</span></div>
-    ${items.length?`<div class="colsum">${own?'Vanguard: ':'Договоры: '}${money(sum)}</div>`:''}
+    ${items.length?`<div class="colsum">Сумма: ${money(sum)}</div>`:''}
     ${items.map(c=>kcard(c,s,own,me,city==='all')).join('')||'<div class="muted small" style="padding:12px 6px">Перетащите карточку сюда</div>'}</div>`;
   }).join('');
   return tb+`<div class="board" id="board">${cols}</div>`;
@@ -837,10 +837,10 @@ function kcard(c,s,own,me,showCity){
     ${c.offerExpiredAt&&statusById(c.status).id==='bron'?'<span class="muted">Не подтвердил предложенную дату</span><br>':''}
     ${statusById(c.status).id==='decide'?'<span style="color:#E8743B;font-weight:600">Под вопросом: '+esc(c.decideReason||'—')+'</span><br>'+(c.decideNote?'<span class="muted">'+esc(c.decideNote)+'</span><br>':''):''}
     ${num(c.refund)?'<span style="color:var(--danger);font-weight:600">Возврат '+money(c.refund)+(c.refundMode==='pct'&&c.refundPct!==''?' ('+c.refundPct+'%)':'')+'</span><br>':''}
-    ${money(r.cost)} · ${planOf(c)==='100'?'оплата 100%':planOf(c)==='custom'?'оплачено '+r.pct+'%':'оплата '+planOf(c)}<br>
+    ${planOf(c)==='100'?'оплата 100%':planOf(c)==='custom'?'оплачено '+r.pct+'%':'оплата '+planOf(c)}<br>
     Продал: ${esc(empName(c.soldBy))}<br>
     ${!['bron','offered'].includes(statusById(c.status).id)?'Связка: '+esc(empName(c.techId))+' + '+esc(empName(c.teacherId))+(c.address?'<br>Адрес: '+esc(c.address):''):''}</div>
-    ${own?`<div class="tot"><span class="small muted">Итого Vanguard</span><b>${money(r.vanguard)}</b></div>`:(mine?`<div class="tot"><span class="small muted">Ваша доля</span><b>${money(mine)}</b></div>`:'')}
+    <div class="tot"><span class="small muted">Сумма</span><b>${money(r.cost)}</b></div>
   </div>`;
 }
 function clientRows(list){
