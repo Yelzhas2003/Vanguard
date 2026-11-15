@@ -390,7 +390,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 02:35</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 02:45</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -2095,7 +2095,7 @@ function viewMe(){
           <div class="mb-chips">${(me.roles||[]).filter(r=>r!=='owner').map(r=>`<span>${(ROLES.find(x=>x.id===r)||{}).name}</span>`).join('')}${(me.roles||[]).includes('owner')?'<span>Тренер</span>':''}</div>
           ${me.photo?'<a href="#" data-act="rmPhoto" class="mb-rm">убрать фото</a>':''}<div class="mb-sub">${[me.email?'Логин: '+esc(emailToLogin(me.email)):'',(me.cities||[]).map(c=>CITY_NAME[c]).join(', ')].filter(Boolean).join(' · ')}</div></div></div>
       <div class="mb-mid">${nextEv?`<div class="mb-lbl">${icon('cal')} Ближайшее</div><div class="mb-ev">${esc(nextEv.type||'Запись')}${nextEv.title?' · '+esc(nextEv.title):''}</div>
-          <div class="mb-evs">${WD[(new Date(nextEv.date+'T00:00:00').getDay()+6)%7]}, ${dshow(nextEv.date)}${nextEv.start?' · '+nextEv.start:''}${nextEv.city&&CITY_NAME[nextEv.city]?' · '+CITY_NAME[nextEv.city]:''}</div>${nextEv.arrive&&nextEv.techId===me.id?`<div class="mb-arr">⏰ Экзамен в ${nextEv.start} — будьте на месте в <b>${nextEv.arrive}</b></div>`:''}<div class="mb-cd">${cdown(nextEv)}</div>`
+          <div class="mb-evs">${WD[(new Date(nextEv.date+'T00:00:00').getDay()+6)%7]}, ${dshow(nextEv.date)}${nextEv.start?' · '+nextEv.start:''}${nextEv.city&&CITY_NAME[nextEv.city]?' · '+CITY_NAME[nextEv.city]:''}</div>${nextEv.arrive?`<div class="mb-arr">⏰ Экзамен в ${nextEv.start} — будьте на месте в <b>${nextEv.arrive}</b></div>`:''}<div class="mb-cd">${cdown(nextEv)}</div>`
           :`<div class="mb-lbl">${icon('cal')} Ближайшее</div><div class="mb-ev">Записей пока нет</div><div class="mb-evs">Добавьте свободное время — вас предложат в связку</div>`}</div>
       <div class="mb-right"><div class="mb-lbl">${icon('wallet')} К выплате</div><div class="mb-big">${money(due)}</div>
         <div class="mb-evs">${pastDue>0?'ждёт выплаты '+money(pastDue)+' · ':''}за текущий период ${money(curDue)} — выплата ${dshow(curEnd).slice(0,5)}</div>
@@ -2161,15 +2161,15 @@ function buildItems(from,to,pf){
         type:x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||''),title:c.name,who:pairName(x),city:x.city,conf:false,comment:c.address?'Адрес: '+c.address:'',techId:x.techId,arrive:x.start?fromMin(toMin(x.start)-ARRIVE_MIN):''});return}
     if(x.type==='slot'){const cid=slotOwner(x);const c=cid?S.clients[cid]:null;
       if(!c&&pf.free===false)return;
-      items.push({kind:'slot',id:x.id,date:x.date,start:x.start,end,free:!c,color:c?(x.bookKind==='retake'?RETAKE_COLOR:EXAM_COLOR):SLOT_FREE,
+      items.push({kind:'slot',id:x.id,date:x.date,start:x.start,end,free:!c,arrive:c&&x.start?fromMin(toMin(x.start)-ARRIVE_MIN):'',color:c?(x.bookKind==='retake'?RETAKE_COLOR:EXAM_COLOR):SLOT_FREE,
         type:c?(x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam||'')):'Свободен · '+freeRoleLabel(x),title:c?c.name:'',who:empName(x.playerId),city:c?x.city:'all',conf:false});return}
     items.push({kind:'ev',id:x.id,date:x.date,start:x.start||'',end,color:evType(x.type).color,type:evType(x.type).name,
       title:x.clientId&&S.clients[x.clientId]?S.clients[x.clientId].name:(x.title||''),who:empName(x.playerId),city:x.city,conf:conflictsOf(x,all.filter(y=>y.type!=='slot')).length>0,comment:x.comment||''})});
   const live=id=>id&&S.sched[id]&&(sessLive(S.sched[id])||(S.sched[id].type==='slot'&&!S.sched[id].deleted&&slotOwner(S.sched[id])));
   liveClients().filter(c=>!c.archived&&pf.cl(c)).forEach(c=>{
-    if(!live(c.sessionId)&&!live(c.slotId)&&c.examDate&&c.examDate>=from&&c.examDate<=to)items.push({kind:'exam',id:c.id,date:c.examDate,start:c.examTime||'',end:'',color:EXAM_COLOR,type:'Экзамен '+(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||''),title:c.name,who:[empName(c.techId),empName(c.teacherId)].filter(x=>x!=='—').join(' + '),city:c.city,conf:false});
+    if(!live(c.sessionId)&&!live(c.slotId)&&c.examDate&&c.examDate>=from&&c.examDate<=to)items.push({kind:'exam',id:c.id,date:c.examDate,start:c.examTime||'',arrive:c.examTime?fromMin(toMin(c.examTime)-ARRIVE_MIN):'',end:'',color:EXAM_COLOR,type:'Экзамен '+(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||''),title:c.name,who:[empName(c.techId),empName(c.teacherId)].filter(x=>x!=='—').join(' + '),city:c.city,conf:false});
     const r=c.retake;
-    if(r&&!live(r.sessionId)&&!live(r.slotId)&&r.date&&r.date>=from&&r.date<=to)items.push({kind:'exam',id:c.id,date:r.date,start:r.time||'',end:'',color:RETAKE_COLOR,type:'Пересдача',title:c.name,who:[empName(c.techId),empName(c.teacherId)].filter(x=>x!=='—').join(' + '),city:c.city,conf:false});
+    if(r&&!live(r.sessionId)&&!live(r.slotId)&&r.date&&r.date>=from&&r.date<=to)items.push({kind:'exam',id:c.id,date:r.date,start:r.time||'',arrive:r.time?fromMin(toMin(r.time)-ARRIVE_MIN):'',end:'',color:RETAKE_COLOR,type:'Пересдача',title:c.name,who:[empName(c.techId),empName(c.teacherId)].filter(x=>x!=='—').join(' + '),city:c.city,conf:false});
   });
   return items.sort((a,b)=>(a.date+(a.start||'99')).localeCompare(b.date+(b.start||'99')));
 }
@@ -2351,7 +2351,7 @@ function evHtml(it,showCity){
     <div>${it.start?`<span class="tm">${it.start}${it.end?'–'+it.end:''}</span> `:''}<span class="ty">${esc(it.type)}</span></div>
     ${it.title?`<div><b>${esc(it.title)}</b></div>`:''}
     <div class="who2">${esc([it.who,showCity?cityLabel(it.city):''].filter(Boolean).join(' · '))}</div>
-    ${it.arrive&&it.kind==='session'&&!it.free?`<div class="arr">Тех на месте: <b>${it.arrive}</b></div>`:''}
+    ${it.arrive&&!it.free?`<div class="arr">На месте: <b>${it.arrive}</b></div>`:''}
     ${it.conf?'<div style="color:var(--danger);font-weight:600">Пересечение по времени</div>':''}</div>`;
 }
 function viewSchedule(){
