@@ -390,7 +390,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 03:30</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 03:45</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -462,7 +462,7 @@ function calcClient(c){
 }
 
 /* Ставки, которые фиксируются в карточке клиента при сохранении */
-function empRate(emp,city,role){
+function empRate(emp,city,role){if(emp&&isNoPayE(emp))return 0;
   if(!emp) return 0;
   if(role==='sales' && emp.noSales) return 0;
   const v=emp.rates&&emp.rates[city]&&emp.rates[city][role];
@@ -1185,9 +1185,9 @@ function drawClientForm(){
     <div class="field"><label class="lbl">Комментарий</label><textarea class="input" id="c-comment" rows="2">${esc(c.comment||'')}</textarea></div>
     ${own?`<div class="field"><label class="lbl">Ставки по этому клиенту</label>
       <div class="row">
-        ${c.status!=='bron'?`<div class="pct"><span class="small muted">Учитель</span><input class="input" id="r-teacher" inputmode="decimal" value="${c.rates.teacher}">%</div>
-        <div class="pct"><span class="small muted">Тех</span><input class="input" id="r-tech" inputmode="decimal" value="${c.rates.tech}">%</div>`:''}
-        <div class="pct"><span class="small muted">Продажа</span><input class="input" id="r-sales" inputmode="decimal" value="${c.rates.sales}" ${c.soldBy==='self'?'disabled':''}>%</div>
+        ${c.status!=='bron'?`<div class="pct"><span class="small muted">Учитель</span><input class="input" id="r-teacher" inputmode="decimal" value="${isNoPay(c.teacherId)?0:c.rates.teacher}" ${isNoPay(c.teacherId)?'disabled title="Не получает проценты"':''}>%</div>
+        <div class="pct"><span class="small muted">Тех</span><input class="input" id="r-tech" inputmode="decimal" value="${isNoPay(c.techId)?0:c.rates.tech}" ${isNoPay(c.techId)?'disabled title="Не получает проценты"':''}>%</div>`:''}
+        <div class="pct"><span class="small muted">Продажа</span><input class="input" id="r-sales" inputmode="decimal" value="${isNoPay(c.soldBy)?0:c.rates.sales}" ${c.soldBy==='self'||isNoPay(c.soldBy)?'disabled':''}>%</div>
       </div>
       ${c.rates.extras.length?`<div class="small" style="margin-top:8px">Доплаты по правилам: ${c.rates.extras.map(x=>esc(empName(x.empId))+' '+x.pct+'%').join(', ')}</div>`:''}
       <div class="note">Проценты фиксируются в карточке клиента при сохранении. Если потом изменить ставку игрока в разделе «Игроки», этот клиент не пересчитается.${changed?' <b>Вы сменили игрока — ставки подставлены заново.</b>':''}</div>
@@ -1414,7 +1414,7 @@ function viewStaff(){
     <div class="small muted" style="margin-top:2px">${e.email?'Логин: '+esc(emailToLogin(e.email))+(e.userId?' · входил':' · ещё не входил'):(e.userId?'вход настроен':'<span style="color:var(--warn)">логин не указан</span>')}</div>
     <div class="row" style="margin:10px 0 6px;gap:6px">${(e.roles||[]).includes('owner')?'<span class="chip acc">Тренер</span>':''}${isRemote(e)?'<span class="chip acc">Учитель удалённо · все города</span>':''}</div>
     <div class="small muted" style="line-height:1.7">${rolesSummary(e)}</div>
-    ${isNoPay(e.id)?'<div class="note" style="margin-top:12px">Работает не за процент — всегда 0 ₸, доля идёт Vanguard</div>':(()=>{const m=empMoney(e.id,L);return `<div class="row" style="margin-top:14px;gap:18px;align-items:flex-end"><div><div class="tiny muted">Заработано за всё время</div><div class="num" style="font-size:20px">${money(m.earned)}</div></div>
+    ${isNoPay(e.id)?'<div class="note" style="margin-top:12px">Не получает проценты — всегда 0 ₸</div>':(()=>{const m=empMoney(e.id,L);return `<div class="row" style="margin-top:14px;gap:18px;align-items:flex-end"><div><div class="tiny muted">Заработано за всё время</div><div class="num" style="font-size:20px">${money(m.earned)}</div></div>
       <div><div class="tiny muted">Потенциально</div><div class="num" style="font-size:16px">${money(m.potential)}</div><div class="tiny muted">${m.openN?m.openN+' '+plural(m.openN,'сделка','сделки','сделок')+' в работе':'нет сделок в работе'}</div></div></div>`})()}
     <div class="row" style="margin-top:12px"><button class="btn sm" data-emp-card="${e.id}">Карточка и выплаты</button><button class="btn ib sm" data-emp-edit="${e.id}" title="Изменить" aria-label="Изменить"><svg class="i" viewBox="0 0 24 24">${KIC.pencil}</svg></button><button class="btn ib sm danger" data-emp-del="${e.id}" title="Удалить" aria-label="Удалить"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button></div>
   </div>`).join('')}</div>`;
@@ -1460,15 +1460,15 @@ function drawEmpForm(){
     <div style="display:flex;flex-direction:column;gap:10px">${ROLE_BOX.map(R=>{const rc=E.rc[R.id];return `<div style="border:1px solid ${rc.on?'var(--accent)':'var(--line)'};border-radius:12px;padding:14px 16px">
       <label class="check" style="font-weight:650;font-size:16px"><input type="checkbox" data-role-on="${R.id}" ${rc.on?'checked':''}> ${R.name}</label>
       ${rc.on?`<div class="tiny muted" style="margin:4px 0 10px 28px">${R.hint}</div>
-        <div style="margin-left:28px;display:flex;flex-direction:column;gap:8px">${CITIES.map(c=>{const inC=R.allCities||rc.cities.includes(c.id);const dis=R.id==='sales'&&E.noSales;return `<div class="row" style="gap:12px;flex-wrap:nowrap">
+        <div style="margin-left:28px;display:flex;flex-direction:column;gap:8px">${CITIES.map(c=>{const inC=R.allCities||rc.cities.includes(c.id);const np=isNoPayE(E);const dis=np||(R.id==='sales'&&E.noSales);return `<div class="row" style="gap:12px;flex-wrap:nowrap">
           ${R.allCities?`<span class="small" style="width:110px;flex:none;font-weight:600">${c.name}</span>`:`<label class="check small" style="width:110px;flex:none"><input type="checkbox" data-role-city="${R.id}.${c.id}" ${inC?'checked':''}> ${c.name}</label>`}
-          ${inC?(dis?'<span class="small muted">0% (без процента за продажу)</span>':`<div class="pct"><input class="input" data-rate="${c.id}.${R.id}" inputmode="decimal" value="${num((E.rates[c.id]||{})[R.id])}">%</div>${R.id!=='sales'&&RATE_HINTS[c.id][R.id]?`<span class="tiny muted">${RATE_HINTS[c.id][R.id]}</span>`:''}`):'<span class="tiny muted">не работает в этом городе</span>'}
+          ${inC?(dis?'<span class="small muted">'+(np?'0% (не получает проценты)':'0% (без процента за продажу)')+'</span>':`<div class="pct"><input class="input" data-rate="${c.id}.${R.id}" inputmode="decimal" value="${num((E.rates[c.id]||{})[R.id])}">%</div>${R.id!=='sales'&&RATE_HINTS[c.id][R.id]?`<span class="tiny muted">${RATE_HINTS[c.id][R.id]}</span>`:''}`):'<span class="tiny muted">не работает в этом городе</span>'}
         </div>`}).join('')}</div>`:''}
     </div>`}).join('')}</div>
     ${E._origRates?'<div class="note">Изменение ролей и ставок не пересчитывает уже сохранённых клиентов: у них проценты зафиксированы в момент сохранения.</div>':''}</div>
    <div class="field"><label class="check"><input type="checkbox" id="e-owner" ${E.owner?'checked':''}> Тренер <span class="muted small">(видит всё: аналитику, игроков, выплаты, настройки)</span></label></div>
    <div class="field"><label class="check"><input type="checkbox" id="e-noSales" ${E.noSales?'checked':''}> Без процента за продажу <span class="muted small">(для тренера и партнёров)</span></label></div>
-   <div class="field"><label class="check"><input type="checkbox" id="e-noPay" ${isNoPayE(E)?'checked':''}> Работает не за процент — всегда 0 ₸ <span class="muted small">(его доля остаётся Vanguard)</span></label></div>
+   <div class="field"><label class="check"><input type="checkbox" id="e-noPay" ${isNoPayE(E)?'checked':''}> Не получает проценты</label></div>
    <div class="field"><label class="lbl">Статус</label>${seg('active',[{id:'1',name:'Активен'},{id:'0',name:'Неактивен'}],E.active===false?'0':'1')}</div>
    <div class="field"><label class="lbl">Логин для входа (номер телефона или email)</label><input class="input" id="e-email" value="${esc(emailToLogin(E.email||''))}" placeholder="77011234567" autocomplete="off">
      <div class="tiny muted" style="margin-top:6px" id="e-loginhint">${E.email?`В Supabase → Authentication → Add user создайте пользователя с email <b>${esc(loginToEmail(E.email))}</b> и паролем. Игрок входит с логином <b>${esc(emailToLogin(loginToEmail(E.email)))}</b>.`:'Например номер телефона: 77011234567. Затем создайте этот логин в Supabase (подсказка появится здесь).'}</div></div>
@@ -1485,7 +1485,7 @@ function drawEmpForm(){
   $$('[data-role-city]',box).forEach(el=>el.onchange=()=>{const [r,c]=el.dataset.roleCity.split('.');const rc=E.rc[r];rc.cities=el.checked?[...new Set([...rc.cities,c])]:rc.cities.filter(x=>x!==c);drawEmpForm()});
   $('#e-owner',box).onchange=e=>{E.owner=e.target.checked;if(E.owner)E.noSales=true;drawEmpForm()};
   $('#e-noSales',box).onchange=e=>{E.noSales=e.target.checked;drawEmpForm()};
-  $('#e-noPay',box).onchange=e=>{E.noPay=e.target.checked};
+  $('#e-noPay',box).onchange=e=>{E.noPay=e.target.checked;drawEmpForm()};
   $$('[data-rate]',box).forEach(i=>i.oninput=()=>{const [c,r]=i.dataset.rate.split('.');E.rates[c]=E.rates[c]||{};E.rates[c][r]=num(i.value);E._touched=true});
   $('[data-seg="active"]',box).onclick=e=>{const b=e.target.closest('button');if(!b)return;E.active=b.dataset.v==='1';drawEmpForm()};
   $('#e-user',box).onchange=e=>E.userId=e.target.value;
@@ -1678,7 +1678,7 @@ function playersTable(){const L=ledger();const rows=liveEmps().filter(e=>e.activ
   return `<div class="sectiontitle" style="margin-top:32px">Игроки — деньги на сегодня</div>
   <p class="small muted" style="margin-top:-6px">Потенциально — по сделкам в работе (если закроются без возврата). Заработано и к выплате — только закрытые сделки. За всё время, все города.</p>
   <div class="tablewrap"><table class="t"><thead><tr><th>Игрок</th><th class="r">Потенциально</th><th class="r">Сделок в работе</th><th class="r">Заработано</th><th class="r">Выплачено</th><th class="r">К выплате</th><th class="r">Потеряно на возвратах</th></tr></thead><tbody>
-  ${rows.map(r=>r.nopay?`<tr><td><div class="row" style="flex-wrap:nowrap;gap:8px;align-items:center">${avatar(r.e,26)}<b>${esc(r.e.name)}</b></div></td><td class="r muted" colspan="6">не за процент — всегда 0 ₸</td></tr>`
+  ${rows.map(r=>r.nopay?`<tr><td><div class="row" style="flex-wrap:nowrap;gap:8px;align-items:center">${avatar(r.e,26)}<b>${esc(r.e.name)}</b></div></td><td class="r muted" colspan="6">не получает проценты — 0 ₸</td></tr>`
     :`<tr><td><div class="row" style="flex-wrap:nowrap;gap:8px;align-items:center">${avatar(r.e,26)}<b>${esc(r.e.name)}</b></div></td><td class="r">${nfmt(r.potential)}</td><td class="r">${nfmt(r.openN)}</td><td class="r">${nfmt(r.earned)}</td><td class="r">${nfmt(r.paid)}</td><td class="r"><b>${nfmt(r.due)}</b></td><td class="r">${r.lost?'<span style="color:var(--danger)">−'+nfmt(r.lost)+'</span>':'—'}</td></tr>`).join('')}
   <tr class="sub"><td><b>Итого</b></td><td class="r"><b>${nfmt(T('potential'))}</b></td><td></td><td class="r"><b>${nfmt(T('earned'))}</b></td><td class="r"><b>${nfmt(T('paid'))}</b></td><td class="r"><b>${nfmt(T('due'))}</b></td><td class="r">${T('lost')?'−'+nfmt(T('lost')):'—'}</td></tr>
   </tbody></table></div>`}
