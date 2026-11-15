@@ -390,7 +390,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 03:45</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 04:00</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1711,7 +1711,7 @@ function viewAnalytics(){
     <div class="chartbox" style="grid-column:1/-1"><div class="row"><h3 class="grow">Выручка и чистые</h3><div class="tabs"><button data-anser="decade" class="${a.series==='decade'?'on':''}">По 10-дневкам</button><button data-anser="month" class="${a.series==='month'?'on':''}">По месяцам</button></div></div>
       <div class="small muted">Чистые — после долей команды, расходов по клиентам и общих расходов</div><div class="cv"><canvas id="ch-time"></canvas></div></div>
     <div class="chartbox"><h3>Сравнение городов</h3><div class="small muted">За выбранный период</div><div class="cv"><canvas id="ch-city"></canvas></div></div>
-    <div class="chartbox"><h3>Топ игроков по заработку</h3><div class="small muted">За выбранный период</div><div class="cv"><canvas id="ch-emp"></canvas></div></div>
+    <div class="chartbox"><h3>Топ игроков по заработку</h3><div class="small muted">Закрытые сделки за выбранный период (по дате закрытия)</div><div class="cv"><canvas id="ch-emp"></canvas></div></div>
     <div class="chartbox"><h3>Экзамены</h3><div class="small muted">Количество клиентов</div><div class="cv"><canvas id="ch-exam"></canvas></div></div>
     <div class="chartbox"><h3>Воронка статусов</h3><div class="small muted">Доля успешных = довольные ÷ все закрытые сделки${s.success===null?'':': <b>'+s.success+'%</b>'}</div><div class="cv"><canvas id="ch-status"></canvas></div></div>
   </div>
@@ -1769,7 +1769,8 @@ function drawAnalytics(){
       {label:'Общая выручка',data:cityStats.map(s=>s.revenue),backgroundColor:cA,borderRadius:4,maxBarThickness:36},
       {label:'Чистые Vanguard',data:cityStats.map(s=>s.net),backgroundColor:cB,borderRadius:4,maxBarThickness:36}]},options:chartOpts()}));
     const s=stats(a.city,rng);
-    const top=Object.entries(s.byEmp).sort((x,y)=>y[1]-x[1]).slice(0,8);
+    const ce={};liveClients().filter(c=>isClosed(c)&&(S.an.city==='all'||!S.an.city||c.city===S.an.city)).forEach(c=>{const d=closedDate(c);if(!d||d<rng.start||d>rng.end)return;Object.entries(calcClient(c).byEmp).forEach(([id,v])=>{if(v>0)ce[id]=(ce[id]||0)+v})});
+    const top=Object.entries(ce).sort((x,y)=>y[1]-x[1]).slice(0,8);
     if(el('ch-emp'))S.charts.push(new Chart(el('ch-emp'),{type:'bar',data:{labels:top.map(([id])=>empName(id)),datasets:[{label:'Заработано',data:top.map(x=>x[1]),backgroundColor:c1,borderRadius:4,maxBarThickness:22}]},options:chartOpts(true,true)}));
     const exams=EXAMS.map(x=>s.byExam[x]||0);
     const co=chartOpts(true,true);co.scales.x.ticks.callback=v=>v;co.scales.x.ticks.precision=0;
