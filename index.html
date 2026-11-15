@@ -379,6 +379,10 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
 .kmore:hover{color:var(--text)}
 .kcard .tot{align-items:center}
 .kcard .meta{margin-bottom:4px}
+
+.kflag{display:inline-flex;align-items:center;gap:4px}
+.kfx{border:0;background:transparent;color:var(--fc);font-size:15px;line-height:1;padding:0 0 0 2px;cursor:pointer;opacity:.7;font-weight:700}
+.kfx:hover{opacity:1}
 </style>
 </head>
 <body>
@@ -386,7 +390,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 02:20</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 02:35</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -833,17 +837,29 @@ function viewBoard(city){
   }).join('');
   return tb+`<div class="board" id="board">${cols}</div>`;
 }
-function kflags(c,r){const st=statusById(c.status).id;const f=[];const F_=(col,t)=>f.push(`<span class="kflag" style="--fc:${col}">${t}</span>`);
-  if(st==='decide')F_('#E8743B','Под вопросом: '+esc(c.decideReason||'—'));
+function kflags(c,r){const st=statusById(c.status).id;const f=[];const F_=(col,t,rm)=>f.push(`<span class="kflag" style="--fc:${col}">${t}${rm&&S.canWrite?`<button type="button" class="kfx" data-kflag="${c.id}|${rm}" title="Убрать метку" aria-label="Убрать метку">×</button>`:''}</span>`);
+  if(st==='decide'&&c.decideReason)F_('#E8743B','Под вопросом: '+esc(c.decideReason),'decide');
   const o=closedOutcome(c);
   if(o==='good')F_('var(--ok)','Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):''));
   if(o==='bad')F_('var(--danger)','Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':''));
   if(num(c.refund))F_('var(--danger)','Возврат '+money(c.refund));
-  if(c.retake&&st!=='closed')F_('#8B6FD6','Пересдача '+(c.retake.kind==='paid'?'платная':c.retake.kind==='free'?'бесплатная':'расходная')+(c.retake.date?' · '+dshow(c.retake.date).slice(0,5):' · без даты'));
+  if(c.retake&&st!=='closed')F_('#8B6FD6','Пересдача '+(c.retake.kind==='paid'?'платная':c.retake.kind==='free'?'бесплатная':'расходная')+(c.retake.date?' · '+dshow(c.retake.date).slice(0,5):' · без даты'),'retake');
   if(st==='offered')F_(offerExpired(c)?'var(--danger)':'var(--warn)',offerExpired(c)?'Время истекло':'Предложено до '+holdLabel(c.offerExpires));
   if((st==='process'||st==='decide')&&!c.examDate)F_('var(--warn)','Дата не выбрана');
-  if(c.offerExpiredAt&&st==='bron')F_('var(--muted)','Не подтвердил дату');
+  if(c.offerExpiredAt&&st==='bron')F_('var(--muted)','Не подтвердил дату','noconf');
   return f.length?`<div class="kflags">${f.join('')}</div>`:''}
+async function dropFlag(id,k){const c=S.clients[id];if(!c)return;
+  const name={decide:'«Под вопросом»',retake:'пересдачу',noconf:'«Не подтвердил дату»'}[k];
+  if(!await ask('Убрать '+name+'?',k==='retake'?'Пересдача будет удалена из карточки, её время в расписании освободится.':esc(c.name||''),'Убрать'))return;
+  const hist=[...(c.history||[]),{at:nowIso(),by:S.uid||'',action:'убрана метка: '+name}].slice(-60);
+  try{
+    if(k==='decide')await updDoc(BASE+'/clients/'+id,{decideReason:'',decideNote:'',history:hist,updatedAt:nowIso()});
+    if(k==='noconf')await updDoc(BASE+'/clients/'+id,{offerExpiredAt:null,history:hist,updatedAt:nowIso()});
+    if(k==='retake'){const r=c.retake||{};
+      if(r.sessionId&&S.sched[r.sessionId])await updDoc(BASE+'/schedule/'+r.sessionId,{deleted:true});
+      if(r.slotId&&S.sched[r.slotId])await updDoc(BASE+'/schedule/'+r.slotId,{clientId:'',bookKind:''});
+      await updDoc(BASE+'/clients/'+id,{retake:null,history:hist,updatedAt:nowIso()})}
+    toast('Метка убрана')}catch(e){}}
 function kcard(c,s,own,me,showCity){
   const r=calcClient(c);const open=!!(S.kopen&&S.kopen[c.id]);
   return `<div class="kcard ${open?'open':''}" draggable="${S.canWrite}" data-cid="${c.id}" style="--sc:${s.color}">
@@ -2528,6 +2544,7 @@ function bindView(r){
   v.onclick=async e=>{
     if((r==='schedule'||r==='me')&&schedClick(e))return;
     if(e.target.closest('[data-act="myFree"]')){const m=myEmp();openSlots(null,m&&m.id);return}
+    const kf=e.target.closest('[data-kflag]');if(kf){e.stopPropagation();const [id,k]=kf.dataset.kflag.split('|');dropFlag(id,k);return}
     const kt=e.target.closest('[data-ktoggle]');if(kt){e.stopPropagation();const id=kt.dataset.ktoggle;S.kopen=S.kopen||{};S.kopen[id]=!S.kopen[id];const card=kt.closest('.kcard');const c=S.clients[id];
       if(card&&c){card.outerHTML=kcard(c,statusById(c.status),isOwner(),myEmp(),S.route==='all')}return}
     const t=e.target.closest('[data-act],[data-mode],[data-cid],[data-emp-edit],[data-emp-del],[data-emp-card],[data-staff],[data-pay],[data-pay-open],[data-unpay],[data-anmode],[data-anser],[data-exp],[data-rule-edit],[data-rule-del],[data-st-up],[data-st-del],[data-seg] button');
