@@ -390,7 +390,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 04:00</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 04:15</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1925,13 +1925,14 @@ function leadToClient(id){
 
 /* ===== АНАЛИТИКА ПРОДАЖ ===== */
 function slRange(){const a=S.sl;if(a.mode==='all')return {start:'2000-01-01',end:'2999-12-31'};const ym=a.month||today().slice(0,7);const [y,m]=ym.split('-').map(Number);return {start:ym+'-01',end:isoDate(y,m,new Date(y,m,0).getDate())}}
-function saleDate(c){return c.payDate||(c.createdAt?String(c.createdAt).slice(0,10):'')}
+function saleDate(c){return c.examDate||''}
 function salesStats(rng,city){
   const inR=d=>d&&d>=rng.start&&d<=rng.end;
   const leads=liveLeads().filter(l=>(city==='all'||l.city===city)&&inR(leadDate(l)));
   const sales=liveClients().filter(c=>(city==='all'||c.city===city)&&inR(saleDate(c)));
   const s={leads:leads.length,booked:leads.filter(l=>l.status==='booked').length,lost:leads.filter(l=>l.status==='lost').length,open:leads.filter(l=>l.status==='new'||l.status==='pending').length,
     sales:sales.length,sum:sales.reduce((a,c)=>a+calcClient(c).cost,0),bySeller:{},bySrc:{},reasons:{},byCity:{}};
+  const pend=liveClients().filter(c=>!c.archived&&!c.examDate&&!isClosed(c)&&(city==='all'||c.city===city));s.pendN=pend.length;s.pendSum=pend.reduce((a,c)=>a+calcClient(c).cost,0);
   s.avg=s.sales?Math.round(s.sum/s.sales):0;s.conv=s.leads?Math.round(s.booked/s.leads*100):null;
   const B=id=>s.bySeller[id||'']||(s.bySeller[id||'']={leads:0,booked:0,lost:0,sales:0,sum:0,good:0,bad:0});
   leads.forEach(l=>{const b=B(l.sellerId);b.leads++;if(l.status==='booked')b.booked++;if(l.status==='lost')b.lost++;
@@ -1955,18 +1956,18 @@ function viewSales(){
     ${kpi('check','Получено броней',nfmt(s.booked),{...D('booked'),sub:'из лидов периода'})}
     ${kpi('target','Конверсия',s.conv===null?'—':s.conv+'%',{hero:true,sub:'лид → бронь'})}
     ${kpi('frown','Отказов',nfmt(s.lost),{...D('lost')})}
-    ${kpi('doc','Продаж (броней)',nfmt(s.sales),{...D('sales'),sub:'по дате брони'})}
-    ${kpi('coins','Сумма продаж',money(s.sum),{...D('sum'),hero:true})}
-    ${kpi('trend','Средний чек',money(s.avg),{...D('avg')})}</div>
-    ${prev?`<div class="tiny muted" style="margin:-12px 0 16px">Стрелки — изменение к прошлому месяцу</div>`:''}
+    ${kpi('doc','Экзаменов',nfmt(s.sales),{...D('sales'),sub:'по дате экзамена'})}
+    ${kpi('coins','Сумма продаж',money(s.sum),{...D('sum'),hero:true,sub:'по дате экзамена'})}
+    ${kpi('trend','Средний чек',money(s.avg),{...D('avg')})}${kpi('clock','Ожидается',money(s.pendSum),{sub:s.pendN?'броней без даты экзамена: '+s.pendN:'все брони с датой'})}</div>
+    ${prev?`<div class="tiny muted" style="margin:-12px 0 16px">Лиды, брони и отказы — по дате заявки; деньги — по дате экзамена. Стрелки — изменение к прошлому месяцу</div>`:''}
     <div class="charts">
-      <div class="chartbox"><h3>Продажи по месяцам</h3><div class="small muted">Сумма броней за последние 6 месяцев</div><div class="cv"><canvas id="ch-sl-time"></canvas></div></div>
+      <div class="chartbox"><h3>Продажи по месяцам</h3><div class="small muted">Сумма по дате экзамена, последние 6 месяцев</div><div class="cv"><canvas id="ch-sl-time"></canvas></div></div>
       <div class="chartbox"><h3>Откуда приходят лиды</h3><div class="small muted">Лиды и брони по источникам</div><div class="cv"><canvas id="ch-sl-src"></canvas></div></div>
       <div class="chartbox"><h3>Причины отказов</h3><div class="small muted">За выбранный период</div><div class="cv"><canvas id="ch-sl-lost"></canvas></div></div>
-      <div class="chartbox"><h3>Продажи по городам</h3><div class="small muted">Сумма броней</div><div class="cv"><canvas id="ch-sl-city"></canvas></div></div>
+      <div class="chartbox"><h3>Продажи по городам</h3><div class="small muted">Сумма по дате экзамена</div><div class="cv"><canvas id="ch-sl-city"></canvas></div></div>
     </div>
     <div class="sectiontitle">Продажники</div>
-    ${rows.length?`<div class="tablewrap"><table class="t"><thead><tr><th>Продажник</th><th class="r">Лидов</th><th class="r">Броней из лидов</th><th class="r">Отказов</th><th class="r">Конверсия</th><th class="r">Продаж</th><th class="r">Сумма</th><th class="r">Средний чек</th><th class="r">Довольны</th></tr></thead><tbody>
+    ${rows.length?`<div class="tablewrap"><table class="t"><thead><tr><th>Продажник</th><th class="r">Лидов</th><th class="r">Броней из лидов</th><th class="r">Отказов</th><th class="r">Конверсия</th><th class="r">Экзаменов</th><th class="r">Сумма</th><th class="r">Средний чек</th><th class="r">Довольны</th></tr></thead><tbody>
       ${rows.map(([id,b])=>`<tr><td><b>${id?esc(empName(id)):'<span class="muted">не указан</span>'}</b></td><td class="r">${nfmt(b.leads)}</td><td class="r">${nfmt(b.booked)}</td><td class="r">${nfmt(b.lost)}</td><td class="r">${b.leads?Math.round(b.booked/b.leads*100)+'%':'—'}</td><td class="r">${nfmt(b.sales)}</td><td class="r"><b>${nfmt(b.sum)}</b></td><td class="r">${b.sales?nfmt(Math.round(b.sum/b.sales)):'—'}</td><td class="r">${b.good+b.bad?Math.round(b.good/(b.good+b.bad)*100)+'%':'—'}</td></tr>`).join('')}</tbody></table></div>`
       :'<div class="card empty"><b>Пока нет данных</b>Добавляйте лиды в разделе «Лиды» — здесь появится статистика.</div>'}`;
 }
