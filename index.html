@@ -390,7 +390,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 03:00</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 03:30</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -433,6 +433,8 @@ function pad(n){return String(n).padStart(2,'0')}
 function isoDate(y,m,d){return y+'-'+pad(m)+'-'+pad(d)}
 
 /* Расчёт по клиенту — строго по ТЗ, п. 6 */
+function isNoPayE(E){return E.noPay===undefined?(E.name||'').trim().toLowerCase()==='ардак':!!E.noPay}
+function isNoPay(id){const e=id&&typeof S!=='undefined'&&S.emps&&S.emps[id];if(!e)return false;return e.noPay===undefined?(e.name||'').trim().toLowerCase()==='ардак':!!e.noPay}
 function calcClient(c){
   const cost=Math.round(num(c.cost));
   const pct=num(c.paidPct);
@@ -444,12 +446,12 @@ function calcClient(c){
   const baseRev=split?Math.max(0,paid-refund):revenue;
   const r=c.rates||{};
   const shares=[];
-  const add=(empId,role,p,ruleId)=>{p=num(p);shares.push({empId,role,pct:p,amount:baseRev>0?Math.round(baseRev*p/100):0,ruleId:ruleId||null})};
+  const add=(empId,role,p,ruleId)=>{p=isNoPay(empId)?0:num(p);shares.push({empId,role,pct:p,amount:baseRev>0?Math.round(baseRev*p/100):0,ruleId:ruleId||null})};
   if(c.teacherId) add(c.teacherId,'teacher',r.teacher);
   if(c.techId) add(c.techId,'tech',r.tech);
   if(c.soldBy && c.soldBy!=='self') add(c.soldBy,'sales',r.sales);
   (r.extras||[]).forEach(x=>{if(x&&x.empId) add(x.empId,'extra',x.pct,x.ruleId)});
-  if(split){[[c.teacherId,'teacher',c.retake.tPct],[c.techId,'tech',c.retake.hPct]].forEach(([id,role,p])=>{p=num(p);if(id&&p)shares.push({empId:id,role,pct:p,amount:Math.round(fee*p/100),ruleId:null,retake:true})})}
+  if(split){[[c.teacherId,'teacher',c.retake.tPct],[c.techId,'tech',c.retake.hPct]].forEach(([id,role,p])=>{p=isNoPay(id)?0:num(p);if(id&&p)shares.push({empId:id,role,pct:p,amount:Math.round(fee*p/100),ruleId:null,retake:true})})}
   const sharesTotal=shares.reduce((s,x)=>s+x.amount,0);
   const rexp=c.retake&&c.retake.kind==='expense'?Math.round(num(c.retake.fee)):0;
   const expense=Math.round(num(c.expense))+rexp;
@@ -712,6 +714,12 @@ const KIC={
 function kpi(ic,label,value,o){o=o||{};
   let d='';if(o.delta!==undefined){const v=o.delta;d=v===null?'<span class="dl dl0">—</span>':v>0?`<span class="dl up">↑ +${v}%</span>`:v<0?`<span class="dl dn">↓ ${v}%</span>`:'<span class="dl dl0">0%</span>'}
   return `<div class="kpi ${o.hero?'hero':''}"><div class="kh">${ic?`<svg class="i" viewBox="0 0 24 24">${KIC[ic]||IC[ic]||''}</svg>`:''}<span>${label}</span></div><div class="kv"><div class="v">${value}</div>${d}</div>${o.sub?`<div class="tiny muted" style="margin-top:2px">${o.sub}</div>`:''}</div>`}
+function empMoney(id,L){L=L||ledger();let earned=0,paid=0,due=0;allPeriodKeys().forEach(k=>{const r=payRow(k,id,L);earned+=r.total;paid+=r.paid;due+=r.due});
+  const inv=c=>c.teacherId===id||c.techId===id||c.soldBy===id||((c.rates&&c.rates.extras)||[]).some(x=>x.empId===id);
+  const mine=liveClients().filter(inv);const open=mine.filter(c=>!isClosed(c));
+  const potential=open.reduce((a,c)=>a+(calcClient({...c,paidPct:100,refund:0}).byEmp[id]||0),0);
+  const lost=mine.filter(isClosed).reduce((a,c)=>a+Math.max(0,(calcClient({...c,refund:0}).byEmp[id]||0)-(calcClient(c).byEmp[id]||0)),0);
+  return {earned,paid,due,potential,openN:open.filter(c=>(calcClient({...c,paidPct:100,refund:0}).byEmp[id]||0)>0).length,lost,clients:mine.length}}
 function avatar(e,size,cls){size=size||40;const st=`width:${size}px;height:${size}px;border-radius:50%;flex:none`;
   return e&&e.photo?`<img class="ava ${cls||''}" src="${e.photo}" alt="" style="${st};object-fit:cover">`:`<div class="ava ${cls||''}" style="${st};background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:800;font-size:${Math.round(size*.42)}px">${esc(((e&&e.name)||'?').slice(0,1).toUpperCase())}</div>`}
 function photoFromFile(f,cb){if(!f)return;if(!/^image\//.test(f.type||'image/')){toast('Нужна картинка');return}const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const z=320,cv=document.createElement('canvas');cv.width=cv.height=z;
@@ -1406,7 +1414,8 @@ function viewStaff(){
     <div class="small muted" style="margin-top:2px">${e.email?'Логин: '+esc(emailToLogin(e.email))+(e.userId?' · входил':' · ещё не входил'):(e.userId?'вход настроен':'<span style="color:var(--warn)">логин не указан</span>')}</div>
     <div class="row" style="margin:10px 0 6px;gap:6px">${(e.roles||[]).includes('owner')?'<span class="chip acc">Тренер</span>':''}${isRemote(e)?'<span class="chip acc">Учитель удалённо · все города</span>':''}</div>
     <div class="small muted" style="line-height:1.7">${rolesSummary(e)}</div>
-    <div class="row" style="margin-top:14px"><div class="grow"><div class="tiny muted">Заработано за всё время</div><div class="num" style="font-size:20px">${money(tot[e.id]||0)}</div></div></div>
+    ${isNoPay(e.id)?'<div class="note" style="margin-top:12px">Работает не за процент — всегда 0 ₸, доля идёт Vanguard</div>':(()=>{const m=empMoney(e.id,L);return `<div class="row" style="margin-top:14px;gap:18px;align-items:flex-end"><div><div class="tiny muted">Заработано за всё время</div><div class="num" style="font-size:20px">${money(m.earned)}</div></div>
+      <div><div class="tiny muted">Потенциально</div><div class="num" style="font-size:16px">${money(m.potential)}</div><div class="tiny muted">${m.openN?m.openN+' '+plural(m.openN,'сделка','сделки','сделок')+' в работе':'нет сделок в работе'}</div></div></div>`})()}
     <div class="row" style="margin-top:12px"><button class="btn sm" data-emp-card="${e.id}">Карточка и выплаты</button><button class="btn ib sm" data-emp-edit="${e.id}" title="Изменить" aria-label="Изменить"><svg class="i" viewBox="0 0 24 24">${KIC.pencil}</svg></button><button class="btn ib sm danger" data-emp-del="${e.id}" title="Удалить" aria-label="Удалить"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button></div>
   </div>`).join('')}</div>`;
 }
@@ -1459,6 +1468,7 @@ function drawEmpForm(){
     ${E._origRates?'<div class="note">Изменение ролей и ставок не пересчитывает уже сохранённых клиентов: у них проценты зафиксированы в момент сохранения.</div>':''}</div>
    <div class="field"><label class="check"><input type="checkbox" id="e-owner" ${E.owner?'checked':''}> Тренер <span class="muted small">(видит всё: аналитику, игроков, выплаты, настройки)</span></label></div>
    <div class="field"><label class="check"><input type="checkbox" id="e-noSales" ${E.noSales?'checked':''}> Без процента за продажу <span class="muted small">(для тренера и партнёров)</span></label></div>
+   <div class="field"><label class="check"><input type="checkbox" id="e-noPay" ${isNoPayE(E)?'checked':''}> Работает не за процент — всегда 0 ₸ <span class="muted small">(его доля остаётся Vanguard)</span></label></div>
    <div class="field"><label class="lbl">Статус</label>${seg('active',[{id:'1',name:'Активен'},{id:'0',name:'Неактивен'}],E.active===false?'0':'1')}</div>
    <div class="field"><label class="lbl">Логин для входа (номер телефона или email)</label><input class="input" id="e-email" value="${esc(emailToLogin(E.email||''))}" placeholder="77011234567" autocomplete="off">
      <div class="tiny muted" style="margin-top:6px" id="e-loginhint">${E.email?`В Supabase → Authentication → Add user создайте пользователя с email <b>${esc(loginToEmail(E.email))}</b> и паролем. Игрок входит с логином <b>${esc(emailToLogin(loginToEmail(E.email)))}</b>.`:'Например номер телефона: 77011234567. Затем создайте этот логин в Supabase (подсказка появится здесь).'}</div></div>
@@ -1475,6 +1485,7 @@ function drawEmpForm(){
   $$('[data-role-city]',box).forEach(el=>el.onchange=()=>{const [r,c]=el.dataset.roleCity.split('.');const rc=E.rc[r];rc.cities=el.checked?[...new Set([...rc.cities,c])]:rc.cities.filter(x=>x!==c);drawEmpForm()});
   $('#e-owner',box).onchange=e=>{E.owner=e.target.checked;if(E.owner)E.noSales=true;drawEmpForm()};
   $('#e-noSales',box).onchange=e=>{E.noSales=e.target.checked;drawEmpForm()};
+  $('#e-noPay',box).onchange=e=>{E.noPay=e.target.checked};
   $$('[data-rate]',box).forEach(i=>i.oninput=()=>{const [c,r]=i.dataset.rate.split('.');E.rates[c]=E.rates[c]||{};E.rates[c][r]=num(i.value);E._touched=true});
   $('[data-seg="active"]',box).onclick=e=>{const b=e.target.closest('button');if(!b)return;E.active=b.dataset.v==='1';drawEmpForm()};
   $('#e-user',box).onchange=e=>E.userId=e.target.value;
@@ -1497,7 +1508,7 @@ async function saveEmp(){
   const rates={};CITIES.forEach(c=>{const rs=rolesByCity[c.id];const r=(E.rates||{})[c.id]||{};
     rates[c.id]={teacher:rs.includes('teacher')?num(r.teacher):0,tech:rs.includes('tech')?num(r.tech):0,sales:rs.includes('sales')&&!E.noSales?num(r.sales):0}});
   const roles=[...new Set(Object.values(rolesByCity).flat())];if(E.owner)roles.push('owner');
-  const data={name:E.name.trim(),cities,rolesByCity,roles,rates,remote:E.rc.teacher.on&&E.rc.teacher.cities.length===CITIES.length,noSales:!!E.noSales,active:E.active!==false,userId:E.userId||'',email,photo:E.photo||'',deleted:false,
+  const data={name:E.name.trim(),cities,rolesByCity,roles,rates,remote:E.rc.teacher.on&&E.rc.teacher.cities.length===CITIES.length,noSales:!!E.noSales,noPay:isNoPayE(E),active:E.active!==false,userId:E.userId||'',email,photo:E.photo||'',deleted:false,
     createdAt:old?old.createdAt:nowIso(),updatedAt:nowIso()};
   closeModal();
   try{await setDoc(BASE+'/employees/'+id,data);toast(old?'Игрок сохранён':'Игрок добавлен')}catch(e){}
@@ -1659,6 +1670,18 @@ function stats(city,rng){
   s.lostRevenue=s.fullSum+s.partialSum;
   return s;
 }
+function plural(n,a,b,c){n=Math.abs(n)%100;const n1=n%10;if(n>10&&n<20)return c;if(n1>1&&n1<5)return b;if(n1===1)return a;return c}
+function playersTable(){const L=ledger();const rows=liveEmps().filter(e=>e.active!==false).map(e=>({e,nopay:isNoPay(e.id),...empMoney(e.id,L)})).filter(r=>r.clients||r.earned||r.paid)
+    .sort((a,b)=>(b.potential+b.due)-(a.potential+a.due));
+  if(!rows.length)return '';
+  const T=k=>rows.reduce((a,r)=>a+(r.nopay?0:r[k]),0);
+  return `<div class="sectiontitle" style="margin-top:32px">Игроки — деньги на сегодня</div>
+  <p class="small muted" style="margin-top:-6px">Потенциально — по сделкам в работе (если закроются без возврата). Заработано и к выплате — только закрытые сделки. За всё время, все города.</p>
+  <div class="tablewrap"><table class="t"><thead><tr><th>Игрок</th><th class="r">Потенциально</th><th class="r">Сделок в работе</th><th class="r">Заработано</th><th class="r">Выплачено</th><th class="r">К выплате</th><th class="r">Потеряно на возвратах</th></tr></thead><tbody>
+  ${rows.map(r=>r.nopay?`<tr><td><div class="row" style="flex-wrap:nowrap;gap:8px;align-items:center">${avatar(r.e,26)}<b>${esc(r.e.name)}</b></div></td><td class="r muted" colspan="6">не за процент — всегда 0 ₸</td></tr>`
+    :`<tr><td><div class="row" style="flex-wrap:nowrap;gap:8px;align-items:center">${avatar(r.e,26)}<b>${esc(r.e.name)}</b></div></td><td class="r">${nfmt(r.potential)}</td><td class="r">${nfmt(r.openN)}</td><td class="r">${nfmt(r.earned)}</td><td class="r">${nfmt(r.paid)}</td><td class="r"><b>${nfmt(r.due)}</b></td><td class="r">${r.lost?'<span style="color:var(--danger)">−'+nfmt(r.lost)+'</span>':'—'}</td></tr>`).join('')}
+  <tr class="sub"><td><b>Итого</b></td><td class="r"><b>${nfmt(T('potential'))}</b></td><td></td><td class="r"><b>${nfmt(T('earned'))}</b></td><td class="r"><b>${nfmt(T('paid'))}</b></td><td class="r"><b>${nfmt(T('due'))}</b></td><td class="r">${T('lost')?'−'+nfmt(T('lost')):'—'}</td></tr>
+  </tbody></table></div>`}
 function viewAnalytics(){
   const a=S.an;const rng=anRange();const s=stats(a.city,rng);
   const keys=allPeriodKeys();
@@ -1692,6 +1715,7 @@ function viewAnalytics(){
     <div class="chartbox"><h3>Экзамены</h3><div class="small muted">Количество клиентов</div><div class="cv"><canvas id="ch-exam"></canvas></div></div>
     <div class="chartbox"><h3>Воронка статусов</h3><div class="small muted">Доля успешных = довольные ÷ все закрытые сделки${s.success===null?'':': <b>'+s.success+'%</b>'}</div><div class="cv"><canvas id="ch-status"></canvas></div></div>
   </div>
+  ${playersTable()}
   <div class="sectiontitle" style="margin-top:32px">Возвраты и недовольные клиенты</div>
   <div class="kpis">
     ${kpi('check','Закрыто сделок',nfmt(s.good+s.badN))}${kpi('smile','Довольны',nfmt(s.good)+(s.good+s.badN?' · '+Math.round(s.good/(s.good+s.badN)*100)+'%':''))}
