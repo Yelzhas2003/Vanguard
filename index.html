@@ -377,7 +377,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 00:30</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 01:10</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -941,7 +941,7 @@ function pairOptions(city,excl,from,to){
   const out=[];const seen=new Set();
   liveSched().filter(w=>w.type==='slot'&&w.date>=from&&w.date<=to&&!slotOwner(w)&&techs.some(t=>t.id===w.playerId)).forEach(w=>{
     const ws=toMin(w.start),we=ws+num(w.dur);
-    for(let t0=ws;t0<=we;t0+=60){
+    for(let t0=ws;t0<=Math.min(we,1439);t0+=60){
       const dd=t0>=1440?addDays(w.date,1):w.date,t=t0>=1440?t0-1440:t0;
       if(dd>to||dd<td||(dd===td&&t<=nm))continue;
       if(!freeAt(w.playerId,city,dd,t,t+L,excl))continue;
@@ -2164,7 +2164,7 @@ function openSlots(date,pid){
       <div class="field"><label class="lbl">Дни недели</label><div class="seg" data-sdays>${WD.map((w,i)=>`<button type="button" data-v="${i}" class="${X.days.includes(i)?'on':''}">${w}</button>`).join('')}</div>
         <div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn sm" data-preset="wd">Будни</button><button type="button" class="btn sm" data-preset="we">Выходные</button><button type="button" class="btn sm" data-preset="all">Каждый день</button></div></div>
       <div class="field"><label class="lbl">Свободен(на) с — до</label><div class="row" style="flex-wrap:nowrap;max-width:320px"><input type="time" class="input" id="sl-t1" value="${X.t1}" step="1800"><span>—</span><input type="time" class="input" id="sl-t2" value="${X.t2}" step="1800"></div>
-        <div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn sm" data-tp="09:00|18:00">09–18</button><button type="button" class="btn sm" data-tp="18:00|23:00">Вечер 18–23</button><button type="button" class="btn sm" data-tp="08:00|01:00">Весь день 08–01</button></div></div>
+        <div class="row" style="margin-top:8px;gap:6px"><button type="button" class="btn sm" data-tp="09:00|18:00">09–18</button><button type="button" class="btn sm" data-tp="18:00|23:00">Вечер 18–23</button><button type="button" class="btn sm" data-tp="08:00|00:00">Весь день 08–00</button></div></div>
       <div class="${len<L?'note':'info'}">${!X.playerId?'Выберите игрока.':len<L?`Окно меньше часа.`:`Будет добавлено дней: <b>${n}</b>. Уже добавленные такие же окна пропускаются.`}</div>
     </div><div class="mf"><button class="btn pri big" data-save ${n&&S.canWrite?'':'disabled'}>Сохранить</button><button class="btn" data-x>Отмена</button></div>`;
     $$('[data-x]',box).forEach(b=>b.onclick=()=>closeModal());
