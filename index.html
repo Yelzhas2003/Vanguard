@@ -377,7 +377,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 01:40</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 01:50</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1042,6 +1042,7 @@ function setFormStatus(v){
   if(v==='offered'&&!F.offers)F.offers=[];
   if(v==='process'&&F.dateMode==='tbd')F.dateMode='slot';
   if(v==='retake'&&!F.retake)F.retake={kind:'free',fee:'',comment:'',dateMode:'slot',slotId:'',date:'',time:''};
+  if(v!=='closed'&&F.closed){F.closed=null;F.refund=0;F.refundPct='';F.refundMode='sum';F.refundComment=''}
   if(v==='closed'&&!F.closed)F.closed={outcome:'',score:'',result:'',attempts:F.retake?'2':'1',refundType:'',comment:'',date:today()};
 }
 function applyRefundFromClosed(){
@@ -1339,7 +1340,8 @@ async function setClientStatus(id,status){
   const c=S.clients[id];if(!c||c.status===status)return;
   if(status==='offered'||status==='retake'||status==='closed'||(status==='decide'&&!S.clients[id].decideReason)||(status==='process'&&!c.examDate)||(status==='bron'&&!(c.level&&c.target&&c.deadline))){openClient(id,false,status);return}
   const hist=[...(c.history||[]),{at:nowIso(),by:S.uid||'',action:'статус → '+statusById(status).name}].slice(-60);
-  try{await updDoc(BASE+'/clients/'+id,{status,updatedAt:nowIso(),updatedBy:S.uid||'',history:hist})}catch(e){}
+  const wasClosed=isClosed(c)&&status!=='closed';
+  try{await updDoc(BASE+'/clients/'+id,{status,updatedAt:nowIso(),updatedBy:S.uid||'',history:hist,...(wasClosed?{closed:null,refund:0,refundPct:'',refundMode:'sum',refundComment:''}:{})});if(wasClosed)toast('Итог сделки (доволен / недоволен, возврат) убран')}catch(e){}
 }
 async function archiveClient(id,val){
   const c=S.clients[id];const hist=[...(c.history||[]),{at:nowIso(),by:S.uid||'',action:val?'отправлен в архив':'возвращён из архива'}].slice(-60);
