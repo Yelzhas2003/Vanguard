@@ -416,7 +416,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 07:50</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 19:00</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -459,8 +459,8 @@ function pad(n){return String(n).padStart(2,'0')}
 function isoDate(y,m,d){return y+'-'+pad(m)+'-'+pad(d)}
 
 /* Расчёт по клиенту — строго по ТЗ, п. 6 */
-function isNoPayE(E){return E.noPay===undefined?(E.name||'').trim().toLowerCase()==='ардак':!!E.noPay}
-function isNoPay(id){const e=id&&typeof S!=='undefined'&&S.emps&&S.emps[id];if(!e)return false;return e.noPay===undefined?(e.name||'').trim().toLowerCase()==='ардак':!!e.noPay}
+function isNoPayE(E){if(E.access==='captain')return true;return E.noPay===undefined?(E.name||'').trim().toLowerCase()==='ардак':!!E.noPay}
+function isNoPay(id){const e=id&&typeof S!=='undefined'&&S.emps&&S.emps[id];if(!e)return false;if(e.access==='captain')return true;return e.noPay===undefined?(e.name||'').trim().toLowerCase()==='ардак':!!e.noPay}
 function rtMode(rt,k){return rt[k+'Mode']||(rt.splitMode==='sum'?'sum':'pct')}
 function rtAmounts(rt,fee){const a=k=>rtMode(rt,k)==='sum'?Math.round(num(rt[k+'Sum'])):Math.round(fee*num(rt[k+'Pct'])/100);return {t:a('t'),h:a('h'),v:a('v')}}
 function calcClient(c){
@@ -655,10 +655,17 @@ function closedOutcome(c){if(c.closed&&c.closed.outcome)return c.closed.outcome;
 function emp(id){return S.emps[id]}
 function empName(id){if(!id)return '—';if(id==='self')return 'Сами пришли';const e=S.emps[id];return e?e.name:'(удалён)'}
 function liveEmps(){return Object.values(S.emps).filter(e=>!e.deleted).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru'))}
-function liveClients(){return Object.values(S.clients).filter(c=>!c.deleted)}
+function liveClients(){const L=Object.values(S.clients).filter(c=>!c.deleted);return (S.route==='analytics'||S.route==='sales')?L.filter(anOk):L}
 function myEmp(){return S.uid?liveEmps().find(e=>e.userId===S.uid):null}
 function ownerSetupMode(){return !liveEmps().some(e=>(e.roles||[]).includes('owner')&&e.userId)}
-function isOwner(){const m=myEmp();if(m&&(m.roles||[]).includes('owner'))return true;return ownerSetupMode()}
+function isTrainer(){const m=myEmp();if(m&&(m.roles||[]).includes('owner'))return true;return ownerSetupMode()}
+function isCaptain(){const m=myEmp();return !!(m&&m.access==='captain')}
+function isAnalyst(){const m=myEmp();return !!(m&&m.access==='analyst')}
+function isOwner(){return isTrainer()||isCaptain()}
+function canSeeAnalytics(){return isOwner()||isAnalyst()}
+function ieltsScope(){if(isTrainer())return 'all';const m=myEmp();if(!m)return 'noielts';if(m.access==='analyst')return m.anScope||'all';return m.ielts?'all':'noielts'}
+function canAddIelts(){if(isTrainer())return true;const m=myEmp();return !!(m&&m.ielts)}
+function anOk(x){const sc=ieltsScope();const ie=x.exam==='IELTS';return sc==='all'?true:sc==='ielts'?ie:!ie}
 function ledger(){return buildLedger(liveClients(),cfg().accrual)}
 
 /* ---------- запись ---------- */
@@ -769,14 +776,15 @@ const ROUTES=[
   {id:'schedule',name:'Расписание',ic:'cal'},
   {id:'upcoming',name:'Ближайшие записи',ic:'clock'},
   {id:'payouts',name:'Выплаты по 10 дням',ic:'wallet'},
-  {id:'staff',name:'Игроки',ic:'users',own:1},
+  {id:'staff',name:'Игроки',ic:'users',tr:1},
   {grp:'Продажи'},
-  {id:'leads',name:'Лиды',ic:'funnel'},{id:'sales',name:'Аналитика продаж',ic:'trend',own:1},
-  {grp:'Финансы',own:1},
-  {id:'analytics',name:'Аналитика',ic:'chart',own:1},{id:'expenses',name:'Расходы',ic:'receipt',own:1},
-  {grp:'Система',own:1},
-  {id:'journal',name:'Журнал изменений',ic:'doc',own:1},{id:'settings',name:'Настройки',ic:'gear',own:1}];
-function routeOk(id){const r=ROUTES.find(x=>x.id===id);return r&&r.id&&(!r.own||isOwner())&&(!r.me||!!myEmp())}
+  {id:'leads',name:'Лиды',ic:'funnel'},{id:'sales',name:'Аналитика продаж',ic:'trend',an:1},
+  {grp:'Финансы',an:1},
+  {id:'analytics',name:'Аналитика',ic:'chart',an:1},{id:'expenses',name:'Расходы',ic:'receipt',own:1},
+  {grp:'Система'},
+  {id:'journal',name:'Журнал изменений',ic:'doc'},{id:'settings',name:'Настройки',ic:'gear',own:1}];
+function routeVis(r){return (!r.own||isOwner())&&(!r.tr||isTrainer())&&(!r.an||canSeeAnalytics())&&(!r.me||!!myEmp())}
+function routeOk(id){const r=ROUTES.find(x=>x.id===id);return r&&r.id&&routeVis(r)}
 function homeRoute(){return !isOwner()&&myEmp()?'me':'astana'}
 function readHash(){const h=location.hash.replace('#','');S.route=routeOk(h)?h:(S.route&&S.route!=='astana'&&routeOk(S.route)?S.route:homeRoute())}
 window.addEventListener('hashchange',()=>{readHash();$('#side').classList.remove('open');render()});
@@ -786,7 +794,7 @@ try{applyMini(localStorage.getItem('vg-mini')==='1')}catch(e){}
 $('#sidetoggle').onclick=()=>applyMini(!document.querySelector('.app').classList.contains('mini'));
 document.addEventListener('click',e=>{if(innerWidth<=860&&$('#side').classList.contains('open')&&!e.target.closest('#side')&&!e.target.closest('#burger'))$('#side').classList.remove('open')});
 function renderNav(){
-  $('#nav').innerHTML=ROUTES.filter(r=>(!r.own||isOwner())&&(!r.me||myEmp())).map(r=>r.grp?'<div class="grp">'+r.grp+'</div>':`<a href="#${r.id}" class="${S.route===r.id?'on':''}" title="${r.name}">${icon(r.ic)}<span class="nl">${r.name}</span></a>`).join('');
+  $('#nav').innerHTML=ROUTES.filter(routeVis).filter((r,i,a)=>!r.grp||(a[i+1]&&!a[i+1].grp)).map(r=>r.grp?'<div class="grp">'+r.grp+'</div>':`<a href="#${r.id}" class="${S.route===r.id?'on':''}" title="${r.name}">${icon(r.ic)}<span class="nl">${r.name}</span></a>`).join('');
   const m=myEmp();
   $('#who').innerHTML=isOwner()?'<b>Тренер</b>'+(m?'<br>'+esc(m.name):''):(m?esc(m.name)+'<br>Игрок':'Игрок<br><span class="tiny">аккаунт не привязан</span>');
 }
@@ -965,7 +973,7 @@ const EXAM_ICON={'TOEFL iBT':'assets/exam-toefl.png','Duolingo':'assets/exam-duo
 function examIcon(ex,size){const u=EXAM_ICON[ex];return u?`<img src="${u}" alt="" style="width:${size||14}px;height:${size||14}px;vertical-align:-2px;margin-right:5px">`:''}
 function examLabel(c){const n=c.exam==='Другое'&&c.examOther?c.examOther:(c.exam||'');return examIcon(c.exam)+esc(n)}
 function blankClient(city){
-  return {id:null,name:'',exam:'IELTS',examOther:'',city:city||'astana',examDate:'',examTime:'',dateMode:'tbd',slotId:'',level:'',target:'',deadline:'',closed:null,payDate:today(),cost:'',paidMode:'100',paidPct:100,payPlan:'100',payParts:[true],
+  return {id:null,name:'',exam:'TOEFL iBT',examOther:'',city:city||'astana',examDate:'',examTime:'',dateMode:'tbd',slotId:'',level:'',target:'',deadline:'',closed:null,payDate:today(),cost:'',paidMode:'100',paidPct:100,payPlan:'100',payParts:[true],
     soldBy:'',teacherId:'',techId:'',status:cfg().statuses[0].id,addon:'none',refund:0,refundMode:'pct',refundPct:'',refundComment:'',retake:null,expense:0,comment:'',rates:{teacher:0,tech:0,sales:0,extras:[]}};
 }
 function openClient(id,copy,presetStatus){
@@ -1152,7 +1160,7 @@ function drawClientForm(){
   <div class="mh"><h2>${c.id?esc(c.name||'Клиент'):'Новый клиент'}</h2><button class="iconbtn" data-x>✕</button></div>
   <div class="mb">
     <div class="field"><label class="lbl">Имя клиента</label><input class="input" id="c-name" value="${esc(c.name)}" placeholder="Фамилия Имя" autocomplete="off"></div>
-    <div class="field"><label class="lbl">Экзамен</label><div class="seg" data-seg="exam">${EXAMS.map(x=>`<button type="button" data-v="${esc(x)}" class="${c.exam===x?'on':''}" style="display:inline-flex;align-items:center">${examIcon(x,16)}${esc(x)}</button>`).join('')}</div>
+    <div class="field"><label class="lbl">Экзамен</label><div class="seg" data-seg="exam">${EXAMS.filter(x=>x!=='IELTS'||c.exam==='IELTS'||(canAddIelts()&&c.city==='shymkent')).map(x=>`<button type="button" data-v="${esc(x)}" class="${c.exam===x?'on':''}" style="display:inline-flex;align-items:center">${examIcon(x,16)}${esc(x)}</button>`).join('')}</div>
       ${c.exam==='Другое'?`<input class="input" id="c-examOther" style="margin-top:8px" placeholder="Какой экзамен?" value="${esc(c.examOther||'')}">`:''}</div>
     <div class="field"><label class="lbl">Город</label>${seg('city',CITIES,c.city)}</div>
     <div class="grid2">
@@ -1357,6 +1365,7 @@ async function saveClient(){
   if(!c.name.trim()){toast('Введите имя клиента');$('#c-name').focus();return}
   if(!num(c.cost)){toast('Введите стоимость');$('#c-cost').focus();return}
   if(c.exam==='Другое'&&!String(c.examOther||'').trim()){toast('Укажите, какой экзамен');return}
+  {const was=c.id&&S.clients[c.id]&&S.clients[c.id].exam==='IELTS';if(c.exam==='IELTS'&&c.city!=='shymkent'){toast('IELTS можно только для клиентов Шымкента');return}if(c.exam==='IELTS'&&!was&&!canAddIelts()){toast('Нет доступа к IELTS');return}}
   if(!c.soldBy){toast('Укажите, кто продал');const el=$('#c-soldBy');if(el){el.focus();el.scrollIntoView({block:'center'})}return}
   const need=(cond,msg,id)=>{if(cond){toast(msg);const el=id&&$('#'+id);if(el){el.focus();el.scrollIntoView({block:'center'})}return true}return false};
   if(c.status==='bron'&&(need(!String(c.level||'').trim(),'Укажите уровень клиента','c-level')||need(!String(c.target||'').trim(),'Укажите, сколько баллов нужно','c-target')||need(!c.deadline,'Укажите дедлайн сдачи','c-deadline')))return;
@@ -1519,9 +1528,10 @@ function drawEmpForm(){
         </div>`}).join('')}</div>`:''}
     </div>`}).join('')}</div>
     ${E._origRates?'<div class="note">Изменение ролей и ставок не пересчитывает уже сохранённых клиентов: у них проценты зафиксированы в момент сохранения.</div>':''}</div>
-   <div class="field"><label class="check"><input type="checkbox" id="e-owner" ${E.owner?'checked':''}> Тренер <span class="muted small">(видит всё: аналитику, игроков, выплаты, настройки)</span></label></div>
-   <div class="field"><label class="check"><input type="checkbox" id="e-noSales" ${E.noSales?'checked':''}> Без процента за продажу <span class="muted small">(для тренера и партнёров)</span></label></div>
-   <div class="field"><label class="check"><input type="checkbox" id="e-noPay" ${isNoPayE(E)?'checked':''}> Не получает проценты</label></div>
+   <div class="field"><label class="lbl">Доступ</label>${seg('acc',[{id:'',name:'Игрок'},{id:'captain',name:'Капитан'},{id:'analyst',name:'Бизнес аналитик'},{id:'owner',name:'Тренер'}],E.owner?'owner':(E.access||''))}
+     <div class="tiny muted" style="margin-top:6px">${E.owner?'Тренер — полный доступ: всё, включая «Игроков» и выдачу ролей.':E.access==='captain'?'Капитан — видит аналитику, выплаты, расходы и настройки. Не видит «Игроков» и не выдаёт роли. Проценты не получает (0% везде).':E.access==='analyst'?'Бизнес аналитик — только смотрит «Аналитику» и «Аналитику продаж».':'Игрок — свой кабинет, клиенты, расписание, лиды.'}</div></div>
+   ${E.access==='analyst'&&!E.owner?`<div class="field"><label class="lbl">Какую аналитику видит</label>${seg('anscope',[{id:'all',name:'Всё'},{id:'noielts',name:'Всё, кроме IELTS'},{id:'ielts',name:'Только IELTS'}],E.anScope||'all')}</div>`:''}
+   ${!E.owner&&E.access!=='analyst'?`<div class="field"><label class="check"><input type="checkbox" id="e-ielts" ${E.ielts?'checked':''}> IELTS <span class="muted small">(может добавлять клиентов IELTS — только Шымкент — и видит аналитику по IELTS)</span></label></div>`:''}
    <div class="field"><label class="lbl">Статус</label>${seg('active',[{id:'1',name:'Активен'},{id:'0',name:'Неактивен'}],E.active===false?'0':'1')}</div>
    <div class="field"><label class="lbl">Логин для входа (номер телефона или email)</label><input class="input" id="e-email" value="${esc(emailToLogin(E.email||''))}" placeholder="77011234567" autocomplete="off">
      <div class="tiny muted" style="margin-top:6px" id="e-loginhint">${E.email?`В Supabase → Authentication → Add user создайте пользователя с email <b>${esc(loginToEmail(E.email))}</b> и паролем. Игрок входит с логином <b>${esc(emailToLogin(loginToEmail(E.email)))}</b>.`:'Например номер телефона: 77011234567. Затем создайте этот логин в Supabase (подсказка появится здесь).'}</div></div>
@@ -1536,9 +1546,9 @@ function drawEmpForm(){
   const pd=$('#e-photo-del',box);if(pd)pd.onclick=()=>{E.photo='';drawEmpForm()};
   $$('[data-role-on]',box).forEach(el=>el.onchange=()=>{const R=ROLE_BOX.find(x=>x.id===el.dataset.roleOn);const rc=E.rc[R.id];rc.on=el.checked;if(rc.on&&(R.allCities||!rc.cities.length))rc.cities=R.def.slice();drawEmpForm()});
   $$('[data-role-city]',box).forEach(el=>el.onchange=()=>{const [r,c]=el.dataset.roleCity.split('.');const rc=E.rc[r];rc.cities=el.checked?[...new Set([...rc.cities,c])]:rc.cities.filter(x=>x!==c);drawEmpForm()});
-  $('#e-owner',box).onchange=e=>{E.owner=e.target.checked;if(E.owner)E.noSales=true;drawEmpForm()};
-  $('#e-noSales',box).onchange=e=>{E.noSales=e.target.checked;drawEmpForm()};
-  $('#e-noPay',box).onchange=e=>{E.noPay=e.target.checked;drawEmpForm()};
+  {const g=$('[data-seg="acc"]',box);if(g)g.onclick=e=>{const b=e.target.closest('button');if(!b)return;const v=b.dataset.v;E.owner=v==='owner';E.access=v==='owner'?'':v;if(E.owner)E.noSales=true;drawEmpForm()}}
+  {const g=$('[data-seg="anscope"]',box);if(g)g.onclick=e=>{const b=e.target.closest('button');if(!b)return;E.anScope=b.dataset.v;drawEmpForm()}}
+  {const el=$('#e-ielts',box);if(el)el.onchange=()=>{E.ielts=el.checked}}
   $$('[data-rate]',box).forEach(i=>i.oninput=()=>{const [c,r]=i.dataset.rate.split('.');E.rates[c]=E.rates[c]||{};E.rates[c][r]=num(i.value);E._touched=true});
   $('[data-seg="active"]',box).onclick=e=>{const b=e.target.closest('button');if(!b)return;E.active=b.dataset.v==='1';drawEmpForm()};
   $('#e-user',box).onchange=e=>E.userId=e.target.value;
@@ -1550,7 +1560,7 @@ async function saveEmp(){
   const rolesByCity={};CITIES.forEach(c=>rolesByCity[c.id]=[]);
   ['teacher','tech','sales'].forEach(r=>{if(E.rc[r].on)E.rc[r].cities.forEach(c=>rolesByCity[c].push(r))});
   const cities=CITIES.map(c=>c.id).filter(c=>rolesByCity[c].length);
-  if(!cities.length&&!E.owner){toast('Отметьте хотя бы одну роль и город');return}
+  if(!cities.length&&!E.owner&&!E.access){toast('Отметьте хотя бы одну роль и город');return}
   if(E.rc.tech.on&&!E.rc.tech.cities.length){toast('Отметьте город тех специалиста');return}
   const email=loginToEmail(E.email);
   if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast('Проверьте логин');return}
@@ -1561,7 +1571,7 @@ async function saveEmp(){
   const rates={};CITIES.forEach(c=>{const rs=rolesByCity[c.id];const r=(E.rates||{})[c.id]||{};
     rates[c.id]={teacher:rs.includes('teacher')?num(r.teacher):0,tech:rs.includes('tech')?num(r.tech):0,sales:rs.includes('sales')&&!E.noSales?num(r.sales):0}});
   const roles=[...new Set(Object.values(rolesByCity).flat())];if(E.owner)roles.push('owner');
-  const data={name:E.name.trim(),cities,rolesByCity,roles,rates,remote:E.rc.teacher.on&&E.rc.teacher.cities.length===CITIES.length,noSales:!!E.noSales,noPay:isNoPayE(E),active:E.active!==false,userId:E.userId||'',email,photo:E.photo||'',deleted:false,
+  const data={name:E.name.trim(),cities,rolesByCity,roles,rates,remote:E.rc.teacher.on&&E.rc.teacher.cities.length===CITIES.length,noSales:!!E.noSales,noPay:E.access==='captain'?true:(E.noPay===undefined?isNoPayE(E):!!E.noPay),access:E.owner?'':(E.access||''),anScope:E.access==='analyst'?(E.anScope||'all'):'',ielts:!!E.ielts&&!E.owner,active:E.active!==false,userId:E.userId||'',email,photo:E.photo||'',deleted:false,
     createdAt:old?old.createdAt:nowIso(),updatedAt:nowIso()};
   closeModal();
   try{await setDoc(BASE+'/employees/'+id,data);toast(old?'Игрок сохранён':'Игрок добавлен')}catch(e){}
@@ -1947,7 +1957,7 @@ function openExp(id){
 const LEAD_ST=[{id:'new',name:'Новые лиды',color:'#3B82F6'},{id:'pending',name:'Недобитые',color:'#E9B949'},{id:'booked',name:'Получена бронь',color:'#16a34a'},{id:'lost',name:'Отказ',color:'#e34948'}];
 const LEAD_SRC=['Instagram','WhatsApp','TikTok','Telegram','Рекомендация','Звонок','Другое'];
 const LOST_REASONS=['Дорого','Не отвечает','Передумал','Выбрал другую компанию','Не подходят сроки','Другое'];
-function liveLeads(){return Object.values(S.leads||{}).filter(x=>!x.deleted)}
+function liveLeads(){const L=Object.values(S.leads||{}).filter(x=>!x.deleted);return S.route==='sales'?L.filter(anOk):L}
 function leadSt(id){return LEAD_ST.find(s=>s.id===id)||LEAD_ST[0]}
 function leadDate(l){return String(l.createdAt||'').slice(0,10)}
 function daysAgo(iso){if(!iso)return '';const d=Math.floor((Date.now()-new Date(iso).getTime())/864e5);return d<=0?'сегодня':d===1?'вчера':d+' дн. назад'}
@@ -1993,13 +2003,13 @@ function leadCard(l,s){
 }
 function openLead(id){
   const me=myEmp();
-  const x=id?{...S.leads[id]}:{name:'',phone:'',source:'Instagram',exam:'IELTS',city:CITY_NAME[S.ld.city]?S.ld.city:((me&&(me.cities||[])[0])||'astana'),sellerId:me?me.id:'',comment:'',status:'new',nextAt:''};
+  const x=id?{...S.leads[id]}:{name:'',phone:'',source:'Instagram',exam:'TOEFL iBT',city:CITY_NAME[S.ld.city]?S.ld.city:((me&&(me.cities||[])[0])||'astana'),sellerId:me?me.id:'',comment:'',status:'new',nextAt:''};
   const sellers=liveEmps();
   const m=openModal(`<div class="mh"><h2>${id?'Лид':'Новый лид'}</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
     <div class="grid2"><div class="field"><label class="lbl">Имя <span style="color:var(--danger)">*</span></label><input class="input" id="ld-name" value="${esc(x.name)}" autocomplete="off"></div>
     <div class="field"><label class="lbl">Телефон</label><input class="input" id="ld-phone" value="${esc(x.phone||'')}" inputmode="tel" placeholder="+7 7…"></div></div>
     <div class="field"><label class="lbl">Откуда пришёл</label>${seg('lsrc',LEAD_SRC.map(v=>({id:v,name:v})),x.source)}</div>
-    <div class="field"><label class="lbl">Экзамен</label>${seg('lexam',EXAMS.map(v=>({id:v,name:v})),x.exam)}</div>
+    <div class="field"><label class="lbl">Экзамен</label>${seg('lexam',EXAMS.filter(v=>v!=='IELTS'||x.exam==='IELTS'||canAddIelts()).map(v=>({id:v,name:v})),x.exam)}</div>
     <div class="field"><label class="lbl">Город</label>${seg('lcity',CITIES,x.city)}</div>
     <div class="grid2"><div class="field"><label class="lbl">Продажник</label><select class="select" id="ld-seller-f"><option value="">— не выбран —</option>${sellers.map(e=>`<option value="${e.id}" ${x.sellerId===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select></div>
     <div class="field"><label class="lbl">Этап</label><select class="select" id="ld-status">${LEAD_ST.map(s=>`<option value="${s.id}" ${(x.status||'new')===s.id?'selected':''}>${s.name}</option>`).join('')}</select></div></div>
@@ -2524,7 +2534,7 @@ function pairsAt(city,date,start,excl){
 }
 function openQuickBook(date){
   const me=myEmp();
-  const Q={src:'bron',clientId:'',name:'',cost:'',city:S.sch.city||(me&&(me.cities||[])[0])||'astana',exam:'IELTS',examOther:'',date:date||'',time:'',address:'',pair:null};
+  const Q={src:'bron',clientId:'',name:'',cost:'',city:S.sch.city||(me&&(me.cities||[])[0])||'astana',exam:'TOEFL iBT',examOther:'',date:date||'',time:'',address:'',pair:null};
   openModal('<div id="qbf"></div>',{});
   const draw=()=>{const box=$('#qbf');
     const brons=liveClients().filter(c=>!c.archived&&c.status==='bron').sort((a,b)=>(!!a.examDate-!!b.examDate)||(a.name||'').localeCompare(b.name||'','ru'));
@@ -2542,7 +2552,7 @@ function openQuickBook(date){
         <div class="field"><label class="lbl">Стоимость, ₸</label><input class="input num" id="q-cost" inputmode="numeric" value="${Q.cost===''?'':nfmt(num(Q.cost))}" placeholder="210 000"></div></div>
         <div class="field"><label class="lbl">Кто продал</label><select class="select" id="q-seller"><option value="">— выберите —</option>${sellerList(Q.city).map(e=>`<option value="${e.id}" ${Q.soldBy===e.id?'selected':''}>${esc(e.name)}</option>`).join('')}</select></div>`}
       <div class="field"><label class="lbl">Город</label>${seg('qcity',CITIES,Q.city)}</div>
-      <div class="field"><label class="lbl">Экзамен</label>${seg('qexam',EXAMS.map(x=>({id:x,name:x})),Q.exam)}
+      <div class="field"><label class="lbl">Экзамен</label>${seg('qexam',EXAMS.filter(x=>x!=='IELTS'||(canAddIelts()&&Q.city==='shymkent')).map(x=>({id:x,name:x})),Q.exam)}
         ${Q.exam==='Другое'?`<input class="input" id="q-examOther" style="margin-top:8px" placeholder="Какой экзамен?" value="${esc(Q.examOther)}">`:''}</div>
       <div class="grid2"><div class="field"><label class="lbl">Дата</label><input type="date" class="input" id="q-date" value="${esc(Q.date)}"></div>
         <div class="field"><label class="lbl">Точное время начала</label><input type="time" class="input" id="q-time" value="${esc(Q.time)}" step="300"></div></div>
