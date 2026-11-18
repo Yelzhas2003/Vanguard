@@ -397,7 +397,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 06:25</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 06:35</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1695,7 +1695,7 @@ function fin(city,rng){
   const R_=closed.map(c=>calcAt(c));
   const gexp=Object.values(S.expenses).filter(x=>!x.deleted&&x.date>=rng.start&&x.date<=rng.end&&inC(x)).reduce((a,x)=>a+num(x.amount),0);
   const f={bank:bank.reduce((a,c)=>a+calcAt(c).revenue,0),bankN:bank.length,bankList:bank,
-    closedSum:closed.reduce((a,c)=>a+gross(c),0),closedN:closed.length,closedList:closed,
+    closedSum:closed.reduce((a,c)=>a+calcAt(c).revenue,0),closedN:closed.length,closedList:closed,
     team:R_.reduce((a,r)=>a+r.sharesTotal,0),refund:R_.reduce((a,r)=>a+r.refund,0),cexp:R_.reduce((a,r)=>a+r.expense,0),gexp,
     waitSum:wait.reduce((a,c)=>a+calcClient(c).cost,0),waitN:wait.length,waitList:wait,
     waitPList:wait.filter(c=>c.examDate&&c.examDate>=rng.start&&c.examDate<=rng.end),
@@ -1735,7 +1735,7 @@ function finBreakdown(f){
     </tbody></table></div></details>`;
   const g=c=>{const r=calcAt(c);return r.paid+r.fee};
   return tbl(`Банк Vanguard — ${f.bankN} ${plural(f.bankN,'клиент','клиента','клиентов')} · ${money(f.bank)}`,'bank',rows,[['Сумма',c=>nfmt(g(c))],['Возврат',c=>{const r=calcAt(c);return r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}],['В банке',c=>'<b>'+nfmt(calcAt(c).revenue)+'</b>'],['Закрыта в периоде',c=>cin.has(c.id)?'✓ '+dshow(closedDate(c)).slice(0,5):'—']])
-   +tbl(`Закрытые сделки — ${f.closedN} · ${money(f.closedSum)}`,'closed',f.closedList,[['Сумма',c=>nfmt(g(c))],['Возврат',c=>{const r=calcAt(c);return r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}],['Команде',c=>{const r=calcAt(c);return r.sharesTotal?'−'+nfmt(r.sharesTotal):'—'}],['Расходы',c=>{const r=calcAt(c);return r.expense?'−'+nfmt(r.expense):'—'}],['Vanguard',c=>'<b>'+nfmt(calcAt(c).vanguard)+'</b>']])
+   +tbl(`Закрытые сделки — ${f.closedN} · ${money(f.closedSum)}`,'closed',f.closedList,[['Сумма',c=>nfmt(g(c))],['Возврат',c=>{const r=calcAt(c);return r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}],['После возврата',c=>'<b>'+nfmt(calcAt(c).revenue)+'</b>'],['Команде',c=>{const r=calcAt(c);return r.sharesTotal?'−'+nfmt(r.sharesTotal):'—'}],['Расходы',c=>{const r=calcAt(c);return r.expense?'−'+nfmt(r.expense):'—'}],['Vanguard',c=>'<b>'+nfmt(calcAt(c).vanguard)+'</b>']])
    +(f.waitPN?tbl(`Ожидается в этом периоде — ${f.waitPN} · ${money(f.waitPSum)}`,'waitp',f.waitPList.slice().sort((a,b)=>(a.examDate+(a.examTime||'')).localeCompare(b.examDate+(b.examTime||''))),[['Сумма',c=>nfmt(calcClient(c).cost)]]):'')
    +(f.waitN?tbl(`Ожидается всего — ${f.waitN} · ${money(f.waitSum)}`,'wait',f.waitList.slice().sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9')),[['Сумма',c=>nfmt(calcClient(c).cost)]]):'')}
 function clientsBreakdown(s){const td=today();
@@ -1782,11 +1782,11 @@ function viewAnalytics(){
   const f=fin(a.city,rng);const q=a.mode==='custom'&&(!a.from||!a.to)?null:fin(a.city,pr);const E=k=>q?{delta:pctDelta(f[k],q[k])}:{};
   return tb+`<div class="kpis">
     ${kpi('wallet','Банк Vanguard',money(f.bank),{...E('bank'),hero:true,sub:'клиентов: '+f.bankN+' — деньги получены (за вычетом возвратов), сделка открыта или закрыта в этом периоде'})}
-    ${kpi('check','Закрытые сделки',money(f.closedSum),{...E('closedSum'),sub:'закрыто в этом периоде: '+f.closedN})}
+    ${kpi('check','Закрытые сделки',money(f.closedSum),{...E('closedSum'),sub:'закрыто в этом периоде: '+f.closedN+' · уже за вычетом возвратов'})}
     ${kpi('team','Оплата команде',money(f.team),{...E('team'),sub:'только с закрытых сделок'})}
     ${kpi('undo','Возвраты',money(f.refund),{...E('refund'),sub:'по закрытым сделкам'})}
     ${kpi('stack','Расходы',money(f.expenses),{...E('expenses'),sub:'по клиентам '+money(f.cexp)+' + общие '+money(f.gexp)})}
-    ${kpi('coins','Чистые Vanguard',money(f.net),{...E('net'),hero:true,sub:'закрытые − команда − возвраты − расходы'})}
+    ${kpi('coins','Чистые Vanguard',money(f.net),{...E('net'),hero:true,sub:'закрытые сделки − команда − расходы'})}
     ${kpi('trend','Потенциальные Vanguard',money(f.potential),{...E('potential'),sub:'если бы не возвраты и расходы'})}
     ${kpi('layers','Выручка за период',money(f.revenue),{...E('revenue'),sub:'экзамен в этом периоде и уже прошёл: '+f.revN})}
     ${kpi('cal','Ожидается в этом периоде',money(f.waitPSum),{sub:'клиентов: '+f.waitPN+' — дата экзамена в этом периоде, но ещё не наступила'})}
