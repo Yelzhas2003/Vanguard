@@ -386,6 +386,10 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
 
 .unitbtn{flex:none;min-width:30px;height:30px;border-radius:8px;border:1px solid var(--line2);background:var(--soft);color:var(--text);font-weight:700;font-size:13px;cursor:pointer;padding:0 6px}
 .unitbtn:hover{border-color:var(--accent);color:var(--accent)}
+
+.charts.cq{container-type:inline-size}
+.chartbox.w2{grid-column:1/-1}
+@container (min-width:1284px){.chartbox.w2{grid-column:span 2}}
 </style>
 </head>
 <body>
@@ -393,7 +397,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 06:10</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 06:25</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1792,13 +1796,14 @@ function viewAnalytics(){
   </div>
   <div class="tiny muted" style="margin:-12px 0 16px">Экзамен считается прошедшим, когда наступили его дата и время.${q?` Стрелки — изменение к прошлому периоду (${dshow(pr.start)} – ${dshow(pr.end)})`:''}</div>
   ${finBreakdown(f)}
-  <div class="charts">
+  <div class="charts cq">
     <div class="chartbox" style="grid-column:1/-1"><div class="row"><h3 class="grow">Выручка и чистые</h3><div class="tabs"><button data-anser="decade" class="${a.series==='decade'?'on':''}">По 10-дневкам</button><button data-anser="month" class="${a.series==='month'?'on':''}">По месяцам</button></div></div>
       <div class="small muted">Чистые — после долей команды, расходов по клиентам и общих расходов</div><div class="cv"><canvas id="ch-time"></canvas></div></div>
     <div class="chartbox"><h3>Сравнение городов</h3><div class="small muted">За выбранный период</div><div class="cv"><canvas id="ch-city"></canvas></div></div>
     <div class="chartbox"><h3>Топ игроков по заработку</h3><div class="small muted">Закрытые сделки за выбранный период (по дате закрытия)</div><div class="cv"><canvas id="ch-emp"></canvas></div></div>
     <div class="chartbox"><h3>Экзамены</h3><div class="small muted">Количество клиентов</div><div class="cv"><canvas id="ch-exam"></canvas></div></div>
     <div class="chartbox"><h3>Воронка статусов</h3><div class="small muted">Доля успешных = довольные ÷ все закрытые сделки${s.success===null?'':': <b>'+s.success+'%</b>'}</div><div class="cv"><canvas id="ch-status"></canvas></div></div>
+    <div class="chartbox w2"><h3>Ожидаемые деньги по неделям</h3><div class="small muted">Сумма клиентов по датам экзаменов, которые ещё впереди</div><div class="cv"><canvas id="ch-weeks"></canvas></div></div>
   </div>
   ${playersTable()}
   <div class="sectiontitle" style="margin-top:32px">Возвраты и недовольные клиенты</div>
@@ -1865,6 +1870,13 @@ function drawAnalytics(){
     if(el('ch-reasons'))S.charts.push(new Chart(el('ch-reasons'),{type:'bar',data:{labels:['Проблемы с интернетом','Опоздание','Без причины'],datasets:[{label:'Клиентов',isCount:true,data:[s.reasons.internet||0,s.reasons.late||0,s.reasons.none||0],backgroundColor:c2,borderRadius:4,maxBarThickness:22}]},options:coR}));
     const be=Object.entries(s.badByEmp).sort((x,y)=>y[1]-x[1]).slice(0,8);const coE=chartOpts(true,true);coE.scales.x.ticks.callback=v=>v;coE.scales.x.ticks.precision=0;
     if(el('ch-badEmp'))S.charts.push(new Chart(el('ch-badEmp'),{type:'bar',data:{labels:be.map(([id])=>empName(id)),datasets:[{label:'Недовольных',isCount:true,data:be.map(x=>x[1]),backgroundColor:c2,borderRadius:4,maxBarThickness:22}]},options:coE}));
+    if(el('ch-weeks')){const td=today();const dow=(new Date(td+'T00:00:00').getDay()+6)%7;let ws=addDays(td,-dow);const wk=[];
+      const open=liveClients().filter(c=>!c.archived&&!isClosed(c)&&!examPassed(c)&&(a.city==='all'||!a.city||c.city===a.city));
+      for(let i=0;i<4;i++){const we=addDays(ws,6);const L=open.filter(c=>c.examDate&&c.examDate>=ws&&c.examDate<=we);wk.push({label:(i===0?'Эта неделя':dshow(ws).slice(0,5)+'–'+dshow(we).slice(0,5)),sum:L.reduce((x,c)=>x+calcClient(c).cost,0),n:L.length});ws=addDays(ws,7)}
+      const later=open.filter(c=>c.examDate&&c.examDate>=ws),nod=open.filter(c=>!c.examDate);
+      wk.push({label:'Позже',sum:later.reduce((x,c)=>x+calcClient(c).cost,0),n:later.length});wk.push({label:'Без даты',sum:nod.reduce((x,c)=>x+calcClient(c).cost,0),n:nod.length});
+      const o=chartOpts(false,true);o.plugins=o.plugins||{};o.plugins.tooltip=Object.assign({},o.plugins.tooltip||{},{callbacks:{label:ctx=>money(ctx.raw)+' · клиентов: '+wk[ctx.dataIndex].n}});
+      S.charts.push(new Chart(el('ch-weeks'),{type:'bar',data:{labels:wk.map(w=>w.label),datasets:[{label:'Ожидается',data:wk.map(w=>w.sum),backgroundColor:wk.map((w,i)=>i<4?c1:c2),borderRadius:4,maxBarThickness:40}]},options:o}))}
     if(el('ch-status'))S.charts.push(new Chart(el('ch-status'),{type:'bar',data:{labels:st.map(x=>x.name),datasets:[{label:'Клиентов',isCount:true,data:st.map(x=>s.byStatus[x.id]||0),backgroundColor:st.map(x=>x.color),borderRadius:4,maxBarThickness:22}]},options:co2}));
   });
 }
