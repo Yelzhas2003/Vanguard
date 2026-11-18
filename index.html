@@ -397,7 +397,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 06:35</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 06:45</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1702,7 +1702,7 @@ function fin(city,rng){
     revenue:revCl.reduce((a,c)=>a+calcClient({...c,retake:null}).paid,0)+rtFee,revN:revCl.length,
     potential:closed.reduce((a,c)=>{const r=c.retake&&c.retake.kind==='expense'?{...c.retake,kind:'free',fee:0}:c.retake;return a+calcAt({...c,refund:0,expense:0,retake:r}).vanguard},0)};
   f.waitPSum=f.waitPList.reduce((a,c)=>a+calcClient(c).cost,0);f.waitPN=f.waitPList.length;
-  f.expenses=f.cexp+f.gexp;f.net=R_.reduce((a,r)=>a+r.vanguard,0)-gexp;f.clients=f.bankN+f.waitN;
+  f.expenses=f.cexp+f.gexp;f.net=R_.reduce((a,r)=>a+r.vanguard,0)-gexp;f.potential=f.team+f.refund+f.expenses+f.net;f.clients=f.bankN+f.waitN;
   const good=closed.filter(c=>closedOutcome(c)==='good').length,bad=closed.filter(c=>closedOutcome(c)==='bad').length;f.success=good+bad?Math.round(good/(good+bad)*100):null;
   return f}
 function stats(city,rng){
@@ -1787,7 +1787,7 @@ function viewAnalytics(){
     ${kpi('undo','Возвраты',money(f.refund),{...E('refund'),sub:'по закрытым сделкам'})}
     ${kpi('stack','Расходы',money(f.expenses),{...E('expenses'),sub:'по клиентам '+money(f.cexp)+' + общие '+money(f.gexp)})}
     ${kpi('coins','Чистые Vanguard',money(f.net),{...E('net'),hero:true,sub:'закрытые сделки − команда − расходы'})}
-    ${kpi('trend','Потенциальные Vanguard',money(f.potential),{...E('potential'),sub:'если бы не возвраты и расходы'})}
+    ${kpi('trend','Потенциальные Vanguard',money(f.potential),{...E('potential'),sub:'команда + возвраты + расходы + чистые = все деньги закрытых сделок'})}
     ${kpi('layers','Выручка за период',money(f.revenue),{...E('revenue'),sub:'экзамен в этом периоде и уже прошёл: '+f.revN})}
     ${kpi('cal','Ожидается в этом периоде',money(f.waitPSum),{sub:'клиентов: '+f.waitPN+' — дата экзамена в этом периоде, но ещё не наступила'})}
     ${kpi('clock','Ожидается всего',money(f.waitSum),{sub:'клиентов: '+f.waitN+' — экзамен ещё впереди или без даты'})}
