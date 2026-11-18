@@ -393,7 +393,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 05:20</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 05:35</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1692,8 +1692,10 @@ function fin(city,rng){
     closedSum:closed.reduce((a,c)=>a+gross(c),0),closedN:closed.length,closedList:closed,
     team:R_.reduce((a,r)=>a+r.sharesTotal,0),refund:R_.reduce((a,r)=>a+r.refund,0),cexp:R_.reduce((a,r)=>a+r.expense,0),gexp,
     waitSum:wait.reduce((a,c)=>a+calcClient(c).cost,0),waitN:wait.length,waitList:wait,
+    waitPList:wait.filter(c=>c.examDate&&c.examDate>=rng.start&&c.examDate<=rng.end),
     revenue:revCl.reduce((a,c)=>a+calcClient({...c,retake:null}).paid,0)+rtFee,revN:revCl.length,
     potential:closed.reduce((a,c)=>{const r=c.retake&&c.retake.kind==='expense'?{...c.retake,kind:'free',fee:0}:c.retake;return a+calcAt({...c,refund:0,expense:0,retake:r}).vanguard},0)};
+  f.waitPSum=f.waitPList.reduce((a,c)=>a+calcClient(c).cost,0);f.waitPN=f.waitPList.length;
   f.expenses=f.cexp+f.gexp;f.net=R_.reduce((a,r)=>a+r.vanguard,0)-gexp;f.clients=f.bankN+f.waitN;
   const good=closed.filter(c=>closedOutcome(c)==='good').length,bad=closed.filter(c=>closedOutcome(c)==='bad').length;f.success=good+bad?Math.round(good/(good+bad)*100):null;
   return f}
@@ -1728,7 +1730,8 @@ function finBreakdown(f){
   const g=c=>{const r=calcAt(c);return r.paid+r.fee};
   return tbl(`Банк Vanguard — ${f.bankN} ${plural(f.bankN,'клиент','клиента','клиентов')} · ${money(f.bank)}`,'bank',rows,[['Сумма',c=>nfmt(g(c))],['Возврат',c=>{const r=calcAt(c);return r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}],['В банке',c=>'<b>'+nfmt(calcAt(c).revenue)+'</b>'],['Закрыта в периоде',c=>cin.has(c.id)?'✓ '+dshow(closedDate(c)).slice(0,5):'—']])
    +tbl(`Закрытые сделки — ${f.closedN} · ${money(f.closedSum)}`,'closed',f.closedList,[['Сумма',c=>nfmt(g(c))],['Возврат',c=>{const r=calcAt(c);return r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}],['Команде',c=>{const r=calcAt(c);return r.sharesTotal?'−'+nfmt(r.sharesTotal):'—'}],['Расходы',c=>{const r=calcAt(c);return r.expense?'−'+nfmt(r.expense):'—'}],['Vanguard',c=>'<b>'+nfmt(calcAt(c).vanguard)+'</b>']])
-   +(f.waitN?tbl(`Ожидается — ${f.waitN} · ${money(f.waitSum)}`,'wait',f.waitList.slice().sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9')),[['Сумма',c=>nfmt(calcClient(c).cost)]]):'')}
+   +(f.waitPN?tbl(`Ожидается в этом периоде — ${f.waitPN} · ${money(f.waitPSum)}`,'waitp',f.waitPList.slice().sort((a,b)=>(a.examDate+(a.examTime||'')).localeCompare(b.examDate+(b.examTime||''))),[['Сумма',c=>nfmt(calcClient(c).cost)]]):'')
+   +(f.waitN?tbl(`Ожидается всего — ${f.waitN} · ${money(f.waitSum)}`,'wait',f.waitList.slice().sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9')),[['Сумма',c=>nfmt(calcClient(c).cost)]]):'')}
 function clientsBreakdown(s){const td=today();
   const rows=s.list.slice().sort((a,b)=>(accrualDate(a,cfg().accrual)||'').localeCompare(accrualDate(b,cfg().accrual)||''));
   const wait=liveClients().filter(c=>!c.archived&&!isClosed(c)&&(S.an.city==='all'||!S.an.city||c.city===S.an.city)&&!examPassed(c)).sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9'));
@@ -1780,7 +1783,8 @@ function viewAnalytics(){
     ${kpi('coins','Чистые Vanguard',money(f.net),{...E('net'),hero:true,sub:'закрытые − команда − возвраты − расходы'})}
     ${kpi('trend','Потенциальные Vanguard',money(f.potential),{...E('potential'),sub:'если бы не возвраты и расходы'})}
     ${kpi('layers','Выручка за период',money(f.revenue),{...E('revenue'),sub:'экзамен в этом периоде и уже прошёл: '+f.revN})}
-    ${kpi('clock','Ожидается',money(f.waitSum),{sub:'клиентов: '+f.waitN+' — экзамен ещё впереди или без даты'})}
+    ${kpi('cal','Ожидается в этом периоде',money(f.waitPSum),{sub:'клиентов: '+f.waitPN+' — дата экзамена в этом периоде, но ещё не наступила'})}
+    ${kpi('clock','Ожидается всего',money(f.waitSum),{sub:'клиентов: '+f.waitN+' — экзамен ещё впереди или без даты'})}
     ${kpi('users','Клиентов',nfmt(f.clients),{...E('clients'),sub:'в банке '+f.bankN+' · ожидается '+f.waitN})}
     ${kpi('target','Доля успешных',f.success===null?'—':f.success+'%',{sub:'довольные среди закрытых в периоде'})}
   </div>
