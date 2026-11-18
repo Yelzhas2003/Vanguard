@@ -397,7 +397,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 06:45</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 07:10</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -465,8 +465,8 @@ function calcClient(c){
   if(split){const A=rtAmounts(c.retake,fee);[[c.teacherId,'teacher',A.t],[c.techId,'tech',A.h]].forEach(([id,role,a])=>{a=isNoPay(id)?0:a;if(id&&a)shares.push({empId:id,role,pct:fee?Math.round(a/fee*1000)/10:0,amount:a,ruleId:null,retake:true})})}
   const sharesTotal=shares.reduce((s,x)=>s+x.amount,0);
   const rexp=c.retake&&c.retake.kind==='expense'?Math.round(num(c.retake.fee)):0;
-  const expense=Math.round(num(c.expense))+rexp;
-  const vanguard=revenue-sharesTotal-expense;
+  const expense=0;
+  const vanguard=revenue-sharesTotal;
   const byEmp={};
   shares.forEach(s=>{byEmp[s.empId]=(byEmp[s.empId]||0)+s.amount});
   return {cost,pct,paid,fee,rexp,refund,revenue,split,shares,sharesTotal,expense,vanguard,byEmp};
@@ -1195,7 +1195,7 @@ function drawClientForm(){
     </div>
     <div class="grid2">
       <div class="field"><label class="lbl">Дата брони</label><input type="date" class="input" id="c-payDate" value="${esc(c.payDate||'')}"></div>
-      ${c.status!=='bron'?`<div class="field"><label class="lbl">Расходы по клиенту, ₸</label><input class="input num" id="c-expense" inputmode="numeric" value="${nfmt(num(c.expense))}"></div>`:'<div></div>'}
+<div></div>
     </div>
     <div class="field"><label class="lbl">Комментарий</label><textarea class="input" id="c-comment" rows="2">${esc(c.comment||'')}</textarea></div>
     ${own?`<div class="field"><label class="lbl">Ставки по этому клиенту</label>
@@ -1248,8 +1248,7 @@ function drawCalc(){
    ${lines}
    ${r.split?(()=>{const v=rtAmounts(F.retake,r.fee).v;return `<div class="cl"><span>Пересдача — Vanguard <span class="muted">${r.fee?Math.round(v/r.fee*1000)/10:0}% от ${money(r.fee)}</span></span><span>${money(v)}</span></div>`})():''}
    ${multi.map(([id,v])=>`<div class="cl small muted"><span>${esc(empName(id))} всего (несколько ролей)</span><span>${money(v)}</span></div>`).join('')}
-   ${r.expense-r.rexp?`<div class="cl"><span>Расходы по клиенту</span><span>− ${money(r.expense-r.rexp)}</span></div>`:''}
-   ${r.rexp?`<div class="cl"><span>Расходная пересдача (за наш счёт)</span><span>− ${money(r.rexp)}</span></div>`:''}
+   ${r.rexp?`<div class="cl muted"><span>Расходная пересдача ${money(r.rexp)} — внесите во вкладку «Расходы»</span><span></span></div>`:''}
    ${r.paid+r.fee>0&&r.revenue===0?'<div class="small muted">Полный возврат: доли игроков обнулены.</div>':''}
    <div class="cl tot"><span>Итого Vanguard</span><span>${money(r.vanguard)}</span></div>`;
 }
@@ -1694,7 +1693,7 @@ function fin(city,rng){
   const rtFee=all.filter(c=>c.retake&&c.retake.kind==='paid'&&c.retake.date>=rng.start&&c.retake.date<=rng.end&&happened(c.retake.date,c.retake.time)).reduce((a,c)=>a+Math.round(num(c.retake.fee)),0);
   const R_=closed.map(c=>calcAt(c));
   const gexp=Object.values(S.expenses).filter(x=>!x.deleted&&x.date>=rng.start&&x.date<=rng.end&&inC(x)).reduce((a,x)=>a+num(x.amount),0);
-  const f={bank:bank.reduce((a,c)=>a+calcAt(c).revenue,0),bankN:bank.length,bankList:bank,
+  const f={turnover:bank.reduce((a,c)=>a+gross(c),0),bank:bank.reduce((a,c)=>a+calcAt(c).revenue,0),bankN:bank.length,bankList:bank,
     closedSum:closed.reduce((a,c)=>a+calcAt(c).revenue,0),closedN:closed.length,closedList:closed,
     team:R_.reduce((a,r)=>a+r.sharesTotal,0),refund:R_.reduce((a,r)=>a+r.refund,0),cexp:R_.reduce((a,r)=>a+r.expense,0),gexp,
     waitSum:wait.reduce((a,c)=>a+calcClient(c).cost,0),waitN:wait.length,waitList:wait,
@@ -1702,7 +1701,7 @@ function fin(city,rng){
     revenue:revCl.reduce((a,c)=>a+calcClient({...c,retake:null}).paid,0)+rtFee,revN:revCl.length,
     potential:closed.reduce((a,c)=>{const r=c.retake&&c.retake.kind==='expense'?{...c.retake,kind:'free',fee:0}:c.retake;return a+calcAt({...c,refund:0,expense:0,retake:r}).vanguard},0)};
   f.waitPSum=f.waitPList.reduce((a,c)=>a+calcClient(c).cost,0);f.waitPN=f.waitPList.length;
-  f.expenses=f.cexp+f.gexp;f.net=R_.reduce((a,r)=>a+r.vanguard,0)-gexp;f.potential=f.team+f.refund+f.expenses+f.net;f.clients=f.bankN+f.waitN;
+  f.expenses=f.gexp;f.net=R_.reduce((a,r)=>a+r.vanguard,0);f.netExp=f.net-f.gexp;f.potential=f.team+f.refund+f.net;f.clients=f.bankN+f.waitN;
   const good=closed.filter(c=>closedOutcome(c)==='good').length,bad=closed.filter(c=>closedOutcome(c)==='bad').length;f.success=good+bad?Math.round(good/(good+bad)*100):null;
   return f}
 function stats(city,rng){
@@ -1735,7 +1734,7 @@ function finBreakdown(f){
     </tbody></table></div></details>`;
   const g=c=>{const r=calcAt(c);return r.paid+r.fee};
   return tbl(`Банк Vanguard — ${f.bankN} ${plural(f.bankN,'клиент','клиента','клиентов')} · ${money(f.bank)}`,'bank',rows,[['Сумма',c=>nfmt(g(c))],['Возврат',c=>{const r=calcAt(c);return r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}],['В банке',c=>'<b>'+nfmt(calcAt(c).revenue)+'</b>'],['Закрыта в периоде',c=>cin.has(c.id)?'✓ '+dshow(closedDate(c)).slice(0,5):'—']])
-   +tbl(`Закрытые сделки — ${f.closedN} · ${money(f.closedSum)}`,'closed',f.closedList,[['Сумма',c=>nfmt(g(c))],['Возврат',c=>{const r=calcAt(c);return r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}],['После возврата',c=>'<b>'+nfmt(calcAt(c).revenue)+'</b>'],['Команде',c=>{const r=calcAt(c);return r.sharesTotal?'−'+nfmt(r.sharesTotal):'—'}],['Расходы',c=>{const r=calcAt(c);return r.expense?'−'+nfmt(r.expense):'—'}],['Vanguard',c=>'<b>'+nfmt(calcAt(c).vanguard)+'</b>']])
+   +tbl(`Закрытые сделки — ${f.closedN} · ${money(f.closedSum)}`,'closed',f.closedList,[['Сумма',c=>nfmt(g(c))],['Возврат',c=>{const r=calcAt(c);return r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}],['После возврата',c=>'<b>'+nfmt(calcAt(c).revenue)+'</b>'],['Команде',c=>{const r=calcAt(c);return r.sharesTotal?'−'+nfmt(r.sharesTotal):'—'}],['Vanguard',c=>'<b>'+nfmt(calcAt(c).vanguard)+'</b>']])
    +(f.waitPN?tbl(`Ожидается в этом периоде — ${f.waitPN} · ${money(f.waitPSum)}`,'waitp',f.waitPList.slice().sort((a,b)=>(a.examDate+(a.examTime||'')).localeCompare(b.examDate+(b.examTime||''))),[['Сумма',c=>nfmt(calcClient(c).cost)]]):'')
    +(f.waitN?tbl(`Ожидается всего — ${f.waitN} · ${money(f.waitSum)}`,'wait',f.waitList.slice().sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9')),[['Сумма',c=>nfmt(calcClient(c).cost)]]):'')}
 function clientsBreakdown(s){const td=today();
@@ -1781,13 +1780,13 @@ function viewAnalytics(){
   const D=(c,pv)=>p?pctDelta(c,pv):undefined;
   const f=fin(a.city,rng);const q=a.mode==='custom'&&(!a.from||!a.to)?null:fin(a.city,pr);const E=k=>q?{delta:pctDelta(f[k],q[k])}:{};
   return tb+`<div class="kpis">
+    ${kpi('stack','Оборот за период',money(f.turnover),{...E('turnover'),sub:'все деньги клиентов в банке, без вычета возвратов (без «Ожидается»)'})}
     ${kpi('wallet','Банк Vanguard',money(f.bank),{...E('bank'),hero:true,sub:'клиентов: '+f.bankN+' — деньги получены (за вычетом возвратов), сделка открыта или закрыта в этом периоде'})}
     ${kpi('check','Закрытые сделки',money(f.closedSum),{...E('closedSum'),sub:'закрыто в этом периоде: '+f.closedN+' · уже за вычетом возвратов'})}
     ${kpi('team','Оплата команде',money(f.team),{...E('team'),sub:'только с закрытых сделок'})}
     ${kpi('undo','Возвраты',money(f.refund),{...E('refund'),sub:'по закрытым сделкам'})}
-    ${kpi('stack','Расходы',money(f.expenses),{...E('expenses'),sub:'по клиентам '+money(f.cexp)+' + общие '+money(f.gexp)})}
-    ${kpi('coins','Чистые Vanguard',money(f.net),{...E('net'),hero:true,sub:'закрытые сделки − команда − расходы'})}
-    ${kpi('trend','Потенциальные Vanguard',money(f.potential),{...E('potential'),sub:'команда + возвраты + расходы + чистые = все деньги закрытых сделок'})}
+    ${kpi('coins','Чистые Vanguard',money(f.net),{...E('net'),hero:true,sub:'закрытые сделки (после возвратов) − команда. Расходы — во вкладке «Расходы»'})}
+    ${kpi('trend','Потенциальные Vanguard',money(f.potential),{...E('potential'),sub:'команда + возвраты + чистые = все деньги закрытых сделок'})}
     ${kpi('layers','Выручка за период',money(f.revenue),{...E('revenue'),sub:'экзамен в этом периоде и уже прошёл: '+f.revN})}
     ${kpi('cal','Ожидается в этом периоде',money(f.waitPSum),{sub:'клиентов: '+f.waitPN+' — дата экзамена в этом периоде, но ещё не наступила'})}
     ${kpi('clock','Ожидается всего',money(f.waitSum),{sub:'клиентов: '+f.waitN+' — экзамен ещё впереди или без даты'})}
@@ -1798,7 +1797,7 @@ function viewAnalytics(){
   ${finBreakdown(f)}
   <div class="charts cq">
     <div class="chartbox" style="grid-column:1/-1"><div class="row"><h3 class="grow">Выручка и чистые</h3><div class="tabs"><button data-anser="decade" class="${a.series==='decade'?'on':''}">По 10-дневкам</button><button data-anser="month" class="${a.series==='month'?'on':''}">По месяцам</button></div></div>
-      <div class="small muted">Чистые — после долей команды, расходов по клиентам и общих расходов</div><div class="cv"><canvas id="ch-time"></canvas></div></div>
+      <div class="small muted">Выручка — экзамены периода; чистые — закрытые сделки после возвратов и долей команды</div><div class="cv"><canvas id="ch-time"></canvas></div></div>
     <div class="chartbox"><h3>Сравнение городов</h3><div class="small muted">За выбранный период</div><div class="cv"><canvas id="ch-city"></canvas></div></div>
     <div class="chartbox"><h3>Топ игроков по заработку</h3><div class="small muted">Закрытые сделки за выбранный период (по дате закрытия)</div><div class="cv"><canvas id="ch-emp"></canvas></div></div>
     <div class="chartbox"><h3>Экзамены</h3><div class="small muted">Количество клиентов</div><div class="cv"><canvas id="ch-exam"></canvas></div></div>
@@ -1889,8 +1888,11 @@ function viewExpenses(){
     <input type="month" class="input" id="exp-month" value="${m}"><select class="select" id="exp-city"><option value="">Все города</option>${[...CITIES,{id:'general',name:'Общий'}].map(c=>`<option value="${c.id}" ${S.exp.city===c.id?'selected':''}>${c.name}</option>`).join('')}</select>
     ${m||S.exp.city?'<button class="btn sm ghost" data-act="clearExp">Сбросить</button>':''}
     ${list.length?'<button class="btn sm" data-act="expExport">Excel</button>':''}</div>`;
-  if(!Object.values(S.expenses).some(x=>!x.deleted))return tb+'<div class="card empty"><b>Расходов пока нет</b>Аренда, реклама, сборы — всё, что не относится к конкретному клиенту. Они вычитаются в аналитике.</div>';
-  return tb+`<div class="tablewrap"><table class="t"><thead><tr><th>Дата</th><th>На что</th><th>Город</th><th>Кто заплатил</th><th class="r">Сумма</th></tr></thead>
+  const mm=m||today().slice(0,7);const [yy,mo]=mm.split('-').map(Number);const fr=fin(S.exp.city&&S.exp.city!=='general'?S.exp.city:'all',{start:mm+'-01',end:isoDate(yy,mo,new Date(yy,mo,0).getDate())});
+  const mexp=Object.values(S.expenses).filter(x=>!x.deleted&&String(x.date).startsWith(mm)&&(!S.exp.city||x.city===S.exp.city)).reduce((a,x)=>a+num(x.amount),0);
+  const top=`<div class="kpis">${kpi('coins','Чистые Vanguard',money(fr.net),{sub:MONTHS[mo-1]+' · закрытые сделки − возвраты − команда'})}${kpi('stack','Расходы',money(mexp),{sub:MONTHS[mo-1]+(S.exp.city?' · '+(CITY_NAME[S.exp.city]||'Общий'):'')})}${kpi('wallet','Чистые с учётом расходов',money(fr.net-mexp),{hero:true,sub:'чистые − расходы'})}</div>`;
+  if(!Object.values(S.expenses).some(x=>!x.deleted))return tb+top+'<div class="card empty"><b>Расходов пока нет</b>Аренда, реклама, сборы — всё, что не относится к конкретному клиенту. Они вычитаются в аналитике.</div>';
+  return tb+top+`<div class="tablewrap"><table class="t"><thead><tr><th>Дата</th><th>На что</th><th>Город</th><th>Кто заплатил</th><th class="r">Сумма</th></tr></thead>
   <tbody>${list.map(x=>`<tr class="click" data-exp="${x.id}"><td>${dshow(x.date)}</td><td>${esc(x.what)}</td><td>${CITY_NAME[x.city]||'—'}</td><td>${esc(x.payerId?empName(x.payerId):(x.payer||'—'))}</td><td class="r"><b>${nfmt(x.amount)}</b></td></tr>`).join('')||'<tr><td colspan="5" class="muted">Нет расходов по фильтру</td></tr>'}</tbody>
   <tfoot><tr><td colspan="4">Итого</td><td class="r">${money(total)}</td></tr></tfoot></table></div>`;
 }
