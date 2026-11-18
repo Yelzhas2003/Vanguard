@@ -416,7 +416,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 19:00</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 19:10</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -796,7 +796,7 @@ document.addEventListener('click',e=>{if(innerWidth<=860&&$('#side').classList.c
 function renderNav(){
   $('#nav').innerHTML=ROUTES.filter(routeVis).filter((r,i,a)=>!r.grp||(a[i+1]&&!a[i+1].grp)).map(r=>r.grp?'<div class="grp">'+r.grp+'</div>':`<a href="#${r.id}" class="${S.route===r.id?'on':''}" title="${r.name}">${icon(r.ic)}<span class="nl">${r.name}</span></a>`).join('');
   const m=myEmp();
-  $('#who').innerHTML=isOwner()?'<b>Тренер</b>'+(m?'<br>'+esc(m.name):''):(m?esc(m.name)+'<br>Игрок':'Игрок<br><span class="tiny">аккаунт не привязан</span>');
+  $('#who').innerHTML=isOwner()?'<b>'+(isTrainer()?'Тренер':'Капитан')+'</b>'+(m?'<br>'+esc(m.name):''):(m?esc(m.name)+'<br>Игрок':'Игрок<br><span class="tiny">аккаунт не привязан</span>');
 }
 
 /* ---------- тема ---------- */
@@ -1474,18 +1474,19 @@ function viewStaff(){
   return tb+`<div class="cards">${list.map(e=>`<div class="card emp">
     <div class="row" style="flex-wrap:nowrap;align-items:center">${avatar(e,42)}<div class="nm grow">${esc(e.name)}</div>${e.active===false?'<span class="chip">Неактивен</span>':'<span class="chip acc">Активен</span>'}</div>
     <div class="small muted" style="margin-top:2px">${e.email?'Логин: '+esc(emailToLogin(e.email))+(e.userId?' · входил':' · ещё не входил'):(e.userId?'вход настроен':'<span style="color:var(--warn)">логин не указан</span>')}</div>
-    <div class="row" style="margin:10px 0 6px;gap:6px">${(e.roles||[]).includes('owner')?'<span class="chip acc">Тренер</span>':''}${isRemote(e)?'<span class="chip acc">Учитель удалённо · все города</span>':''}</div>
+    <div class="row" style="margin:10px 0 6px;gap:6px">${(e.roles||[]).includes('owner')?'<span class="chip acc">Тренер</span>':e.access==='captain'?'<span class="chip acc">Капитан</span>':e.access==='analyst'?'<span class="chip acc">Бизнес аналитик</span>':''}${e.ielts&&!(e.roles||[]).includes('owner')?'<span class="chip">IELTS</span>':''}${isRemote(e)?'<span class="chip acc">Учитель удалённо · все города</span>':''}</div>
     <div class="small muted" style="line-height:1.7">${rolesSummary(e)}</div>
-    ${isNoPay(e.id)?'<div class="note" style="margin-top:12px">Не получает проценты — всегда 0 ₸</div>':(()=>{const m=empMoney(e.id,L);return `<div class="row" style="margin-top:14px;gap:18px;align-items:flex-end"><div><div class="tiny muted">Заработано за всё время</div><div class="num" style="font-size:20px">${money(m.earned)}</div></div>
+    ${isNoPay(e.id)?'<div class="note" style="margin-top:12px">'+(e.access==='captain'?'Капитан — ':'')+'не получает проценты, всегда 0 ₸</div>':(()=>{const m=empMoney(e.id,L);return `<div class="row" style="margin-top:14px;gap:18px;align-items:flex-end"><div><div class="tiny muted">Заработано за всё время</div><div class="num" style="font-size:20px">${money(m.earned)}</div></div>
       <div><div class="tiny muted">Потенциально</div><div class="num" style="font-size:16px">${money(m.potential)}</div><div class="tiny muted">${m.openN?m.openN+' '+plural(m.openN,'сделка','сделки','сделок')+' в работе':'нет сделок в работе'}</div></div></div>`})()}
     <div class="row" style="margin-top:12px"><button class="btn sm" data-emp-card="${e.id}">Карточка и выплаты</button><button class="btn ib sm" data-emp-edit="${e.id}" title="Изменить" aria-label="Изменить"><svg class="i" viewBox="0 0 24 24">${KIC.pencil}</svg></button><button class="btn ib sm danger" data-emp-del="${e.id}" title="Удалить" aria-label="Удалить"><svg class="i" viewBox="0 0 24 24">${KIC.trash}</svg></button></div>
   </div>`).join('')}</div>`;
 }
 function rolesSummary(e){
+  const np=isNoPayE(e);
   return (e.cities||[]).map(c=>{const r=(e.rates||{})[c]||{};const rs=rolesIn(e,c);const p=[];
-    if(rs.includes('teacher'))p.push('учитель '+num(r.teacher)+'%');
-    if(rs.includes('tech'))p.push('тех '+num(r.tech)+'%');
-    if(rs.includes('sales'))p.push(e.noSales?'продажа без %':'продажа '+empRate(e,c,'sales')+'%');
+    if(rs.includes('teacher'))p.push('учитель '+(np?0:num(r.teacher))+'%');
+    if(rs.includes('tech'))p.push('тех '+(np?0:num(r.tech))+'%');
+    if(rs.includes('sales'))p.push(np||e.noSales?'продажа без %':'продажа '+empRate(e,c,'sales')+'%');
     return '<b style="color:var(--text2)">'+CITY_NAME[c]+':</b> '+(p.join(', ')||'без ролей')}).join('<br>');
 }
 let E=null;
@@ -2345,7 +2346,7 @@ function viewMe(){
   return `<div class="mebanner">
       <div class="mb-left"><label class="mb-avawrap" title="${me.photo?'Сменить фото':'Загрузить фото'}">${avatar(me,76,'mb-ava')}<span class="mb-cam"><svg class="i" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></span><input type="file" accept="image/*" id="me-photo" hidden></label>
         <div class="mb-name"><div class="mb-hi">${hi},</div><div class="mb-nm">${esc(me.name)}</div>
-          <div class="mb-chips">${(me.roles||[]).filter(r=>r!=='owner').map(r=>`<span>${(ROLES.find(x=>x.id===r)||{}).name}</span>`).join('')}${(me.roles||[]).includes('owner')?'<span>Тренер</span>':''}</div>
+          <div class="mb-chips">${(me.roles||[]).filter(r=>r!=='owner').map(r=>`<span>${(ROLES.find(x=>x.id===r)||{}).name}</span>`).join('')}${me.access==='captain'?'<span>Капитан</span>':me.access==='analyst'?'<span>Бизнес аналитик</span>':''}${(me.roles||[]).includes('owner')?'<span>Тренер</span>':''}</div>
           ${me.photo?'<a href="#" data-act="rmPhoto" class="mb-rm">убрать фото</a>':''}<div class="mb-sub">${[me.email?'Логин: '+esc(emailToLogin(me.email)):'',(me.cities||[]).map(c=>CITY_NAME[c]).join(', ')].filter(Boolean).join(' · ')}</div></div></div>
       <div class="mb-mid">${nextEv?`<div class="mb-lbl">${icon('cal')} Ближайшее</div><div class="mb-ev">${esc(nextEv.type||'Запись')}${nextEv.title?' · '+esc(nextEv.title):''}</div>
           <div class="mb-evs">${WD[(new Date(nextEv.date+'T00:00:00').getDay()+6)%7]}, ${dshow(nextEv.date)}${nextEv.start?' · '+nextEv.start:''}${nextEv.city&&CITY_NAME[nextEv.city]?' · '+CITY_NAME[nextEv.city]:''}</div>${nextEv.arrive?`<div class="mb-arr">⏰ Экзамен в ${nextEv.start} — будьте на месте в <b>${nextEv.arrive}</b></div>`:''}<div class="mb-cd">${cdown(nextEv)}</div>`
