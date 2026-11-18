@@ -383,6 +383,9 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
 .kflag{display:inline-flex;align-items:center;gap:4px}
 .kfx{border:0;background:transparent;color:var(--fc);font-size:15px;line-height:1;padding:0 0 0 2px;cursor:pointer;opacity:.7;font-weight:700}
 .kfx:hover{opacity:1}
+
+.unitbtn{flex:none;min-width:30px;height:30px;border-radius:8px;border:1px solid var(--line2);background:var(--soft);color:var(--text);font-weight:700;font-size:13px;cursor:pointer;padding:0 6px}
+.unitbtn:hover{border-color:var(--accent);color:var(--accent)}
 </style>
 </head>
 <body>
@@ -390,7 +393,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 02:55</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 03:20</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -435,8 +438,8 @@ function isoDate(y,m,d){return y+'-'+pad(m)+'-'+pad(d)}
 /* Расчёт по клиенту — строго по ТЗ, п. 6 */
 function isNoPayE(E){return E.noPay===undefined?(E.name||'').trim().toLowerCase()==='ардак':!!E.noPay}
 function isNoPay(id){const e=id&&typeof S!=='undefined'&&S.emps&&S.emps[id];if(!e)return false;return e.noPay===undefined?(e.name||'').trim().toLowerCase()==='ардак':!!e.noPay}
-function rtAmounts(rt,fee){if(rt.splitMode==='sum')return {t:Math.round(num(rt.tSum)),h:Math.round(num(rt.hSum)),v:Math.round(num(rt.vSum))};
-  return {t:Math.round(fee*num(rt.tPct)/100),h:Math.round(fee*num(rt.hPct)/100),v:Math.round(fee*num(rt.vPct)/100)}}
+function rtMode(rt,k){return rt[k+'Mode']||(rt.splitMode==='sum'?'sum':'pct')}
+function rtAmounts(rt,fee){const a=k=>rtMode(rt,k)==='sum'?Math.round(num(rt[k+'Sum'])):Math.round(fee*num(rt[k+'Pct'])/100);return {t:a('t'),h:a('h'),v:a('v')}}
 function calcClient(c){
   const cost=Math.round(num(c.cost));
   const pct=num(c.paidPct);
@@ -448,7 +451,9 @@ function calcClient(c){
   const baseRev=split?Math.max(0,paid-refund):revenue;
   const r=c.rates||{};
   const shares=[];
-  const add=(empId,role,p,ruleId)=>{p=isNoPay(empId)?0:num(p);shares.push({empId,role,pct:p,amount:baseRev>0?Math.round(baseRev*p/100):0,ruleId:ruleId||null})};
+  const add=(empId,role,p,ruleId)=>{if(isNoPay(empId)){shares.push({empId,role,pct:0,amount:0,ruleId:ruleId||null});return}
+    if(role!=='extra'&&r.mode&&r.mode[role]==='sum'){const a=Math.round(num(r[role+'Sum']));shares.push({empId,role,pct:baseRev>0?Math.round(a/baseRev*1000)/10:0,amount:a,fixed:true,ruleId:ruleId||null});return}
+    p=num(p);shares.push({empId,role,pct:p,amount:baseRev>0?Math.round(baseRev*p/100):0,ruleId:ruleId||null})};
   if(c.teacherId) add(c.teacherId,'teacher',r.teacher);
   if(c.techId) add(c.techId,'tech',r.tech);
   if(c.soldBy && c.soldBy!=='self') add(c.soldBy,'sales',r.sales);
@@ -1149,13 +1154,11 @@ function drawClientForm(){
       <div class="row"><b class="grow">Пересдача</b>${c.status!=='retake'?'<button type="button" class="btn sm danger" data-act="dropRetake">Убрать пересдачу</button>':''}</div>
       <div class="field" style="margin-top:10px">${seg('rkind',[{id:'free',name:'Бесплатная'},{id:'paid',name:'Платная'},{id:'expense',name:'Расходная (платим мы)'}],rt?(rt.kind==='other'?'':rt.kind):'free')}</div>
       ${rt&&rt.kind==='paid'?`<div class="field"><label class="lbl">Клиент доплачивает, ₸ <span class="muted">(добавится к выручке)</span></label><input class="input num" id="rt-fee" inputmode="numeric" value="${rt.fee===''?'':nfmt(num(rt.fee))}" style="max-width:240px"></div>
-        ${(()=>{const fee=num(rt.fee);if(!('tPct' in rt)){rt.tPct='';rt.hPct='';rt.vPct=''}const sm=rt.splitMode==='sum';
-          const inp=(id,v)=>`<input class="input num" id="${id}" inputmode="numeric" value="${v}" placeholder="0" style="width:${sm?110:70}px;min-height:34px;padding:5px 8px">`;
-          const f=k=>sm?(rt[k+'Sum']===''||rt[k+'Sum']===undefined?'':nfmt(num(rt[k+'Sum']))):rt[k+'Pct'];const u=sm?'₸':'%';
-          return `<div class="field"><label class="lbl" style="display:flex;align-items:center;gap:10px">Как делим платную пересдачу <span style="color:var(--danger)">*</span>${seg('rtmode',[{id:'pct',name:'в %'},{id:'sum',name:'в ₸'}],sm?'sum':'pct')}</label><div class="row" style="gap:14px;align-items:center">
-            <label class="small" style="display:flex;align-items:center;gap:6px">Учителю ${inp('rt-t',f('t'))} ${u}<span class="muted" id="rt-ta"></span></label>
-            <label class="small" style="display:flex;align-items:center;gap:6px">Тех специалисту ${inp('rt-h',f('h'))} ${u}<span class="muted" id="rt-ha"></span></label>
-            <label class="small" style="display:flex;align-items:center;gap:6px"><b>Vanguard (чистыми)</b> ${inp('rt-v',f('v'))} ${u}<span class="muted" id="rt-va"></span></label></div>
+        ${(()=>{if(!('tPct' in rt)){rt.tPct='';rt.hPct='';rt.vPct=''}
+          const fld=(k,label)=>{const sm=rtMode(rt,k)==='sum';const v=sm?(rt[k+'Sum']===''||rt[k+'Sum']===undefined?'':nfmt(num(rt[k+'Sum']))):rt[k+'Pct'];
+            return `<label class="small" style="display:flex;align-items:center;gap:6px">${label} <input class="input num" id="rt-${k}" inputmode="numeric" value="${v}" placeholder="0" style="width:${sm?110:70}px;min-height:34px;padding:5px 8px">${unitBtn('rt.'+k,sm)}<span class="muted" id="rt-${k}a"></span></label>`};
+          return `<div class="field"><label class="lbl">Как делим платную пересдачу <span style="color:var(--danger)">*</span> <span class="muted" style="font-weight:400">— у каждого можно выбрать % или ₸</span></label><div class="row" style="gap:14px;align-items:center">
+            ${fld('t','Учителю')}${fld('h','Тех специалисту')}${fld('v','<b>Vanguard (чистыми)</b>')}</div>
             <div class="tiny" id="rt-sum" style="margin-top:4px"></div></div>`})()}`:''}
       ${rt&&rt.kind==='expense'?`<div class="field"><label class="lbl">Стоимость экзамена за наш счёт, ₸ <span class="muted">(уйдёт в расходы по клиенту)</span></label><input class="input num" id="rt-fee" inputmode="numeric" value="${rt.fee===''?'':nfmt(num(rt.fee))}" style="max-width:240px"></div>`:''}
       <div class="field"><label class="lbl">Дата пересдачи</label>${dateBlock('retake')}</div>
@@ -1187,9 +1190,9 @@ function drawClientForm(){
     <div class="field"><label class="lbl">Комментарий</label><textarea class="input" id="c-comment" rows="2">${esc(c.comment||'')}</textarea></div>
     ${own?`<div class="field"><label class="lbl">Ставки по этому клиенту</label>
       <div class="row">
-        ${c.status!=='bron'?`<div class="pct"><span class="small muted">Учитель</span><input class="input" id="r-teacher" inputmode="decimal" value="${isNoPay(c.teacherId)?0:c.rates.teacher}" ${isNoPay(c.teacherId)?'disabled title="Не получает проценты"':''}>%</div>
-        <div class="pct"><span class="small muted">Тех</span><input class="input" id="r-tech" inputmode="decimal" value="${isNoPay(c.techId)?0:c.rates.tech}" ${isNoPay(c.techId)?'disabled title="Не получает проценты"':''}>%</div>`:''}
-        <div class="pct"><span class="small muted">Продажа</span><input class="input" id="r-sales" inputmode="decimal" value="${isNoPay(c.soldBy)?0:c.rates.sales}" ${c.soldBy==='self'||isNoPay(c.soldBy)?'disabled':''}>%</div>
+        ${c.status!=='bron'?`<div class="pct"><span class="small muted">Учитель</span><input class="input" id="r-teacher" inputmode="decimal" value="${rateVal(c,'teacher',isNoPay(c.teacherId)?0:c.rates.teacher)}" style="${rateSum(c,'teacher')?'width:110px':''}" ${isNoPay(c.teacherId)?'disabled title="Не получает проценты"':''}>${unitBtn('r.teacher',rateSum(c,'teacher'))}</div>
+        <div class="pct"><span class="small muted">Тех</span><input class="input" id="r-tech" inputmode="decimal" value="${rateVal(c,'tech',isNoPay(c.techId)?0:c.rates.tech)}" style="${rateSum(c,'tech')?'width:110px':''}" ${isNoPay(c.techId)?'disabled title="Не получает проценты"':''}>${unitBtn('r.tech',rateSum(c,'tech'))}</div>`:''}
+        <div class="pct"><span class="small muted">Продажа</span><input class="input" id="r-sales" inputmode="decimal" value="${rateVal(c,'sales',isNoPay(c.soldBy)?0:c.rates.sales)}" style="${rateSum(c,'sales')?'width:110px':''}" ${c.soldBy==='self'||isNoPay(c.soldBy)?'disabled':''}>${unitBtn('r.sales',rateSum(c,'sales'))}</div>
       </div>
       ${c.rates.extras.length?`<div class="small" style="margin-top:8px">Доплаты по правилам: ${c.rates.extras.map(x=>esc(empName(x.empId))+' '+x.pct+'%').join(', ')}</div>`:''}
       <div class="note">Проценты фиксируются в карточке клиента при сохранении. Если потом изменить ставку игрока в разделе «Игроки», этот клиент не пересчитается.${changed?' <b>Вы сменили игрока — ставки подставлены заново.</b>':''}</div>
@@ -1212,14 +1215,14 @@ function drawClientForm(){
   const nsc=box.closest('.modal').querySelector('.mb');if(nsc)nsc.scrollTop=top;
   bindClientForm(box);
 }
-function rtSplitInfo(){const rt=F&&F.retake;if(!rt||!$('#rt-sum'))return;const fee=num(rt.fee);const sm=rt.splitMode==='sum';
-  const K=['t','h','v'];const filled=K.some(k=>sm?(rt[k+'Sum']!==''&&rt[k+'Sum']!==undefined):rt[k+'Pct']!=='');
-  K.forEach(k=>{const el=$('#rt-'+k+'a');if(!el)return;const has=sm?(rt[k+'Sum']!==''&&rt[k+'Sum']!==undefined):rt[k+'Pct']!=='';
-    el.textContent=!fee||!has?'':sm?' · '+(Math.round(num(rt[k+'Sum'])/fee*1000)/10)+'%':' · '+money(Math.round(fee*num(rt[k+'Pct'])/100))});
-  const el=$('#rt-sum');let ok,txt;
-  if(sm){const tot=K.reduce((a,k)=>a+Math.round(num(rt[k+'Sum'])),0);ok=tot===fee;txt='Всего: '+money(tot)+' из '+money(fee)+(ok?' ✓':tot>fee?' — больше на '+money(tot-fee):' — не хватает '+money(fee-tot))}
-  else{const sum=K.reduce((a,k)=>a+num(rt[k+'Pct']),0);ok=sum===100;txt='Всего: '+sum+'%'+(ok?' ✓':' — должно быть ровно 100%')}
-  el.textContent=txt+'. Заполняется вручную для каждого клиента.';el.style.color=filled&&!ok?'var(--danger)':'var(--muted)'}
+function rateSum(c,k){return !!(c.rates&&c.rates.mode&&c.rates.mode[k]==='sum')}
+function rateVal(c,k,pv){return rateSum(c,k)?nfmt(num(c.rates[k+'Sum'])):pv}
+function unitBtn(key,sm){return `<button type="button" class="unitbtn" data-unit="${key}" title="Переключить: % или сумма в ₸">${sm?'₸':'%'}</button>`}
+function rtSplitInfo(){const rt=F&&F.retake;if(!rt||!$('#rt-sum'))return;const fee=Math.round(num(rt.fee));
+  const K=['t','h','v'];const has=k=>rtMode(rt,k)==='sum'?(rt[k+'Sum']!==''&&rt[k+'Sum']!==undefined):rt[k+'Pct']!=='';const filled=K.some(has);const A=rtAmounts(rt,fee);
+  K.forEach(k=>{const el=$('#rt-'+k+'a');if(!el)return;el.textContent=!fee||!has(k)?'':rtMode(rt,k)==='sum'?'· '+(Math.round(A[k]/fee*1000)/10)+'%':'· '+money(A[k])});
+  const tot=A.t+A.h+A.v;const ok=tot===fee;const el=$('#rt-sum');
+  el.textContent='Всего: '+money(tot)+' из '+money(fee)+(ok?' ✓':tot>fee?' — больше на '+money(tot-fee):' — не хватает '+money(fee-tot))+'. Заполняется вручную для каждого клиента.';el.style.color=filled&&!ok?'var(--danger)':'var(--muted)'}
 function drawCalc(){
   const el=$('#calcbox');if(!el||!F)return;
   const r=calcClient(F);const own=isOwner();const me=myEmp();
@@ -1261,8 +1264,6 @@ function bindClientForm(box){
       applyRates(['teacher','tech','sales'])}
     else if(k==='status')setFormStatus(v);
     else if(k==='dreason')F.decideReason=v;
-    else if(k==='rtmode'){const rt=F.retake;if(rt){const fee=num(rt.fee);if(v==='sum'&&rt.splitMode!=='sum'){['t','h','v'].forEach(x=>rt[x+'Sum']=rt[x+'Pct']===''?'':Math.round(fee*num(rt[x+'Pct'])/100))}
-      if(v==='pct'&&rt.splitMode==='sum'){['t','h','v'].forEach(x=>rt[x+'Pct']=rt[x+'Sum']===''||rt[x+'Sum']===undefined||!fee?'':Math.round(num(rt[x+'Sum'])/fee*1000)/10)}rt.splitMode=v;drawClientForm()}}
     else if(k==='dmode'){F.dateMode=v;if(v!=='slot'){F.slotId='';F.sess=null}if(v==='tbd'){F.examDate='';F.examTime=''}}
     else if(k==='rdmode'){F.retake.dateMode=v;if(v!=='slot'){F.retake.slotId='';F.retake.sess=null}if(v==='tbd'){F.retake.date='';F.retake.time=''}}
     else if(k==='rkind'){F.retake.kind=v;F.retake.fee='';if(v==='paid'){F.retake.tPct='';F.retake.hPct='';F.retake.vPct=''}recalcRefund()}
@@ -1290,11 +1291,17 @@ function bindClientForm(box){
   moneyIn('c-cost',()=>F.cost,v=>F.cost=v);moneyIn('c-refund',()=>F.refund,v=>F.refund=v);moneyIn('c-expense',()=>F.expense,v=>F.expense=v);
   moneyIn('rt-fee',()=>F.retake.fee,v=>F.retake.fee=v);
   {const f=$('#rt-fee',box);if(f&&F.retake&&F.retake.kind==='paid')f.addEventListener('input',()=>rtSplitInfo())}
-  if(F.retake&&F.retake.kind==='paid'){const sm=F.retake.splitMode==='sum';
-    [['rt-t','t'],['rt-h','h'],['rt-v','v']].forEach(([id,k])=>{const el=$('#'+id,box);if(!el)return;
+  if(F.retake&&F.retake.kind==='paid'){
+    ['t','h','v'].forEach(k=>{const el=$('#rt-'+k,box);if(!el)return;const sm=rtMode(F.retake,k)==='sum';
       if(sm){el.oninput=()=>{const t=el.value.replace(/[^\d]/g,'');F.retake[k+'Sum']=t===''?'':num(t);drawCalc();rtSplitInfo()};el.onblur=()=>{if(el.value!=='')el.value=nfmt(num(F.retake[k+'Sum']))};el.onfocus=()=>el.select()}
       else el.oninput=()=>{const t=el.value.replace(/[^\d.]/g,'');F.retake[k+'Pct']=t===''?'':Math.min(100,Math.max(0,num(t)));drawCalc();rtSplitInfo()}});
     rtSplitInfo()}
+  $$('[data-unit]',box).forEach(b=>b.onclick=()=>{const [grp,k]=b.dataset.unit.split('.');
+    if(grp==='rt'){const rt=F.retake,fee=num(rt.fee);const to=rtMode(rt,k)==='sum'?'pct':'sum';
+      if(to==='sum')rt[k+'Sum']=rt[k+'Pct']===''?'':Math.round(fee*num(rt[k+'Pct'])/100);else rt[k+'Pct']=rt[k+'Sum']===''||rt[k+'Sum']===undefined||!fee?'':Math.round(num(rt[k+'Sum'])/fee*1000)/10;rt[k+'Mode']=to}
+    else{const R_=F.rates;R_.mode=R_.mode||{};const base=calcClient({...F,retake:null}).revenue;const to=R_.mode[k]==='sum'?'pct':'sum';
+      if(to==='sum')R_[k+'Sum']=Math.round(base*num(R_[k])/100);else R_[k]=base?Math.round(num(R_[k+'Sum'])/base*1000)/10:0;R_.mode[k]=to}
+    drawClientForm()});
   const rp=$('#c-refundPct',box);if(rp)rp.oninput=()=>{F.refundPct=Math.min(100,Math.max(0,num(rp.value)));recalcRefund();drawCalc()};
   $$('[data-part]',box).forEach(el=>el.onchange=()=>{F.payParts[Number(el.dataset.part)]=el.checked;F.paidPct=pctFromParts(F.payPlan,F.payParts);recalcRefund();drawCalc()});
   const pp=$('#c-paidPct',box);if(pp)pp.oninput=()=>{F.paidPct=Math.min(100,Math.max(0,num(pp.value)));recalcRefund();drawCalc()};
@@ -1302,7 +1309,7 @@ function bindClientForm(box){
     if(role!=='sales'){const bad=o=>o&&((F.techId&&o.techId!==F.techId)||(F.teacherId&&o.teacherId!==F.teacherId));
       if(bad(F.sess)){F.sess=null;F.examDate='';F.examTime=''}if(F.retake&&bad(F.retake.sess)){F.retake.sess=null;F.retake.date='';F.retake.time=''}}
     drawClientForm()}});
-  ['teacher','tech','sales'].forEach(k=>{const el=$('#r-'+k,box);if(el)el.oninput=()=>{F.rates[k]=num(el.value);drawCalc()}});
+  ['teacher','tech','sales'].forEach(k=>{const el=$('#r-'+k,box);if(!el)return;if(rateSum(F,k)){el.oninput=()=>{F.rates[k+'Sum']=num(el.value.replace(/[^\d]/g,''));drawCalc()};el.onblur=()=>{el.value=nfmt(num(F.rates[k+'Sum']))};el.onfocus=()=>el.select()}else el.oninput=()=>{F.rates[k]=num(el.value);drawCalc()}});
   const act=a=>$(`[data-act="${a}"]`,box);
   if(act('dropRetake'))act('dropRetake').onclick=()=>{F.retake=null;recalcRefund();drawClientForm()};
   if(act('refreshRates'))act('refreshRates').onclick=()=>{applyRates(['teacher','tech','sales']);drawClientForm();toast('Ставки обновлены по текущим настройкам игроков')};
@@ -1328,8 +1335,7 @@ async function saveClient(){
   if(c.status==='process'&&!(c.dateMode==='slot'?c.sess||c.slotId:c.dateMode==='manual'&&c.examDate)){toast('Для «Дата утверждена» выберите дату и время');const el=$('#dateblock');if(el)el.scrollIntoView({block:'center'});return}
   if(c.status==='retake'&&(!c.retake||!['paid','free','expense'].includes(c.retake.kind))){toast('Выберите вид пересдачи');return}
   if(c.retake&&c.retake.kind==='paid'&&num(c.retake.fee)&&('tPct' in c.retake)){const rt=c.retake,fee=Math.round(num(rt.fee));
-    if(rt.splitMode==='sum'){const tot=['t','h','v'].reduce((a,k)=>a+Math.round(num(rt[k+'Sum'])),0);if(tot!==fee){toast('Платная пересдача: учитель + тех + Vanguard должно быть ровно '+money(fee));$('#rt-t')&&$('#rt-t').focus();return}}
-    else if(num(rt.tPct)+num(rt.hPct)+num(rt.vPct)!==100){toast('Платная пересдача: учитель + тех + Vanguard должно быть 100%');$('#rt-t')&&$('#rt-t').focus();return}}
+    const A=rtAmounts(rt,fee);if(A.t+A.h+A.v!==fee){toast('Платная пересдача: учитель + тех + Vanguard должно быть ровно '+money(fee));$('#rt-t')&&$('#rt-t').focus();return}}
   if(c.retake&&c.retake.kind==='expense'&&!num(c.retake.fee)){toast('Укажите стоимость расходной пересдачи');$('#rt-fee')&&$('#rt-fee').focus();return}
   if(c.status==='closed'){const cl=c.closed||{};
     if(!cl.outcome){toast('Отметьте: клиент доволен или нужен возврат');return}
@@ -1343,7 +1349,7 @@ async function saveClient(){
   if(c.retake&&c.retake.dateMode==='slot'&&!chk(c.retake.sess,old&&old.retake&&old.retake.sessionId)){toast('Время пересдачи у связки уже занято — выберите другое');F.retake.sess=null;drawClientForm();return}
   if(c.sess&&c.retake&&c.retake.sess&&sameOpt(c.sess,c.retake.sess)){toast('Для пересдачи выберите другое время');return}
   const mainSess=c.dateMode==='slot'?c.sess:null;const rtSess=c.retake&&c.retake.dateMode==='slot'?c.retake.sess:null;
-  const rt=c.retake?{kind:c.retake.kind||'free',fee:(c.retake.kind==='paid'||c.retake.kind==='expense')?Math.round(num(c.retake.fee)):0,...(c.retake.kind==='paid'&&('tPct' in c.retake)?{tPct:num(c.retake.tPct),hPct:num(c.retake.hPct),vPct:num(c.retake.vPct),splitMode:c.retake.splitMode==='sum'?'sum':'pct',...(c.retake.splitMode==='sum'?{tSum:Math.round(num(c.retake.tSum)),hSum:Math.round(num(c.retake.hSum)),vSum:Math.round(num(c.retake.vSum))}:{})}:{}),comment:String(c.retake.comment||'').trim(),
+  const rt=c.retake?{kind:c.retake.kind||'free',fee:(c.retake.kind==='paid'||c.retake.kind==='expense')?Math.round(num(c.retake.fee)):0,...(c.retake.kind==='paid'&&('tPct' in c.retake)?{tPct:num(c.retake.tPct),hPct:num(c.retake.hPct),vPct:num(c.retake.vPct),...Object.fromEntries(['t','h','v'].flatMap(k=>[[k+'Mode',rtMode(c.retake,k)],[k+'Sum',Math.round(num(c.retake[k+'Sum']))]]))}:{}),comment:String(c.retake.comment||'').trim(),
     dateMode:rtSess||c.retake.slotId?'slot':(c.retake.date?'manual':'tbd'),slotId:rtSess?'':(c.retake.slotId||''),sessionId:'',date:c.retake.date||'',time:c.retake.time||''}:null;
   const data={name:c.name.trim(),address:String(c.address||'').trim(),exam:c.exam,examOther:c.exam==='Другое'?String(c.examOther||'').trim():'',city:c.city,
     dateMode:c.dateMode,slotId:c.dateMode==='slot'&&!mainSess?(c.slotId||''):'',sessionId:'',examDate:c.dateMode==='tbd'?'':(c.examDate||''),examTime:c.dateMode==='tbd'?'':(c.examTime||''),payDate:c.payDate||'',
@@ -1356,7 +1362,7 @@ async function saveClient(){
     offers:[],offerExpires:'',
     closed:c.closed?{outcome:c.closed.outcome||'',score:c.closed.outcome==='good'?String(c.closed.score||'').trim():'',result:c.closed.outcome==='good'?String(c.closed.result||'').trim():'',attempts:c.closed.outcome==='good'?String(c.closed.attempts||'').trim():'',
       reasons:c.closed.outcome==='bad'?(c.closed.reasons||[]):[],refundType:c.closed.outcome==='bad'?c.closed.refundType:'',comment:String(c.closed.comment||'').trim(),date:c.closed.date||today()}:null,
-    rates:{teacher:num(c.rates.teacher),tech:num(c.rates.tech),sales:c.soldBy==='self'?0:num(c.rates.sales),extras:(c.rates.extras||[]).map(x=>({empId:x.empId,pct:num(x.pct),ruleId:x.ruleId||null}))},
+    rates:{teacher:num(c.rates.teacher),tech:num(c.rates.tech),sales:c.soldBy==='self'?0:num(c.rates.sales),mode:{teacher:rateSum(c,'teacher')?'sum':'pct',tech:rateSum(c,'tech')?'sum':'pct',sales:rateSum(c,'sales')?'sum':'pct'},teacherSum:Math.round(num(c.rates.teacherSum)),techSum:Math.round(num(c.rates.techSum)),salesSum:c.soldBy==='self'?0:Math.round(num(c.rates.salesSum)),extras:(c.rates.extras||[]).map(x=>({empId:x.empId,pct:num(x.pct),ruleId:x.ruleId||null}))},
     archived:!!(old&&old.archived),deleted:false,
     createdAt:old?old.createdAt:nowIso(),createdBy:old?old.createdBy:(S.uid||''),updatedAt:nowIso(),updatedBy:S.uid||''};
   let action='создан';
