@@ -393,7 +393,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 03:35</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 03:50</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -504,7 +504,7 @@ function isClosed(c){return (LEGACY_STATUS[c.status]||c.status)==='closed'}
 function closedDate(c){return (c.closed&&c.closed.date)||c.examDate||(c.updatedAt?String(c.updatedAt).slice(0,10):null)||c.payDate}
 function accrualDate(c,mode){
   const fb=c.createdAt?String(c.createdAt).slice(0,10):null;
-  return mode==='payment'?(c.payDate||c.examDate||fb):(c.examDate||c.payDate||fb);
+  return mode==='payment'?(c.payDate||c.examDate||fb):(c.examDate||(isClosed(c)?((c.closed&&c.closed.date)||c.payDate||fb):null));
 }
 /* Начисления: период → игрок → {total, byRole, clients} */
 function buildLedger(clients,mode){
@@ -1687,10 +1687,24 @@ function stats(city,rng){
   s.bad.forEach(c=>{const cl_=c.closed||{};const rs=cl_.reasons||[];if(!rs.length)s.reasons.none++;rs.forEach(r=>s.reasons[r]=(s.reasons[r]||0)+1);
     const amt=Math.round(num(c.refund));if(cl_.refundType==='full'||(!cl_.refundType&&c.status==='refund'&&amt>=calcClient({...c,refund:0}).paid)){s.full++;s.fullSum+=amt}else{s.partial++;s.partialSum+=amt}
     [c.teacherId,c.techId].filter(Boolean).forEach(id=>s.badByEmp[id]=(s.badByEmp[id]||0)+1);s.badByCity[c.city]=(s.badByCity[c.city]||0)+1});
-  s.lostRevenue=s.fullSum+s.partialSum;
+  s.lostRevenue=s.fullSum+s.partialSum;s.list=cl;
   return s;
 }
 function plural(n,a,b,c){n=Math.abs(n)%100;const n1=n%10;if(n>10&&n<20)return c;if(n1>1&&n1<5)return b;if(n1===1)return a;return c}
+function clientsBreakdown(s){const td=today();
+  const rows=s.list.slice().sort((a,b)=>(accrualDate(a,cfg().accrual)||'').localeCompare(accrualDate(b,cfg().accrual)||''));
+  const wait=liveClients().filter(c=>!c.archived&&!isClosed(c)&&(S.an.city==='all'||!S.an.city||c.city===S.an.city)&&(!c.examDate||c.examDate>td)).sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9'));
+  const T=rows.map(c=>({c,r:calcClient(c)}));const sum=k=>T.reduce((a,x)=>a+(typeof k==='function'?k(x):x.r[k]),0);
+  const st=c=>{const x=statusById(c.status);return `<span class="badge" style="border-color:${x.color};color:${x.color}">${esc(x.name)}</span>`};
+  return `<details class="card" style="margin-top:24px;padding:0" ${S.an.openList?'open':''} ontoggle="S.an.openList=this.open"><summary style="padding:16px 18px;cursor:pointer;font-weight:700">Клиенты в этих цифрах — ${rows.length} <span class="muted small" style="font-weight:400">(нажмите, чтобы раскрыть)</span></summary>
+    <div class="tablewrap" style="border:0;border-radius:0"><table class="t"><thead><tr><th>#</th><th>Клиент</th><th>Город</th><th>Экзамен</th><th>Статус</th><th class="r">Договор</th><th class="r">Оплачено</th><th class="r">Возврат</th><th class="r">Пересдача</th><th class="r">Выручка</th><th class="r">Команде</th><th class="r">Расходы</th><th class="r">Vanguard</th></tr></thead><tbody>
+    ${T.map(({c,r},i)=>`<tr data-cid="${c.id}" style="cursor:pointer"><td class="muted">${i+1}</td><td><b>${esc(c.name||'—')}</b></td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${dshow(accrualDate(c,cfg().accrual))}</td><td>${st(c)}</td><td class="r">${nfmt(r.cost)}</td><td class="r">${nfmt(r.paid)}</td><td class="r">${r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}</td><td class="r">${r.fee?'+'+nfmt(r.fee):'—'}</td><td class="r">${nfmt(r.revenue)}</td><td class="r">${r.sharesTotal?'−'+nfmt(r.sharesTotal):'—'}</td><td class="r">${r.expense?'−'+nfmt(r.expense):'—'}</td><td class="r"><b>${nfmt(r.vanguard)}</b></td></tr>`).join('')}
+    <tr class="sub"><td></td><td colspan="4"><b>Итого</b></td><td class="r"><b>${nfmt(sum('cost'))}</b></td><td class="r"><b>${nfmt(sum('paid'))}</b></td><td class="r"><b>${sum('refund')?'−'+nfmt(sum('refund')):'—'}</b></td><td class="r"><b>${sum('fee')?'+'+nfmt(sum('fee')):'—'}</b></td><td class="r"><b>${nfmt(sum('revenue'))}</b></td><td class="r"><b>−${nfmt(sum('sharesTotal'))}</b></td><td class="r"><b>${sum('expense')?'−'+nfmt(sum('expense')):'—'}</b></td><td class="r"><b>${nfmt(sum('vanguard'))}</b></td></tr>
+    </tbody></table></div></details>
+  ${wait.length?`<details class="card" style="margin-top:12px;padding:0" ${S.an.openWait?'open':''} ontoggle="S.an.openWait=this.open"><summary style="padding:16px 18px;cursor:pointer;font-weight:700">Ожидается — ${wait.length} ${plural(wait.length,'клиент','клиента','клиентов')} · ${money(wait.reduce((a,c)=>a+calcClient(c).cost,0))} <span class="muted small" style="font-weight:400">(экзамен ещё впереди или без даты)</span></summary>
+    <div class="tablewrap" style="border:0;border-radius:0"><table class="t"><thead><tr><th>#</th><th>Клиент</th><th>Город</th><th>Дата экзамена</th><th>Статус</th><th class="r">Договор</th></tr></thead><tbody>
+    ${wait.map((c,i)=>`<tr data-cid="${c.id}" style="cursor:pointer"><td class="muted">${i+1}</td><td><b>${esc(c.name||'—')}</b></td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${c.examDate?dshow(c.examDate):'<span class="muted">не выбрана</span>'}</td><td>${st(c)}</td><td class="r">${nfmt(calcClient(c).cost)}</td></tr>`).join('')}
+    </tbody></table></div></details>`:''}`}
 function playersTable(){const L=ledger();const rows=liveEmps().filter(e=>e.active!==false).map(e=>({e,nopay:isNoPay(e.id),...empMoney(e.id,L)})).filter(r=>r.clients||r.earned||r.paid)
     .sort((a,b)=>(b.potential+b.due)-(a.potential+a.due));
   if(!rows.length)return '';
@@ -1736,6 +1750,7 @@ function viewAnalytics(){
     <div class="chartbox"><h3>Экзамены</h3><div class="small muted">Количество клиентов</div><div class="cv"><canvas id="ch-exam"></canvas></div></div>
     <div class="chartbox"><h3>Воронка статусов</h3><div class="small muted">Доля успешных = довольные ÷ все закрытые сделки${s.success===null?'':': <b>'+s.success+'%</b>'}</div><div class="cv"><canvas id="ch-status"></canvas></div></div>
   </div>
+  ${clientsBreakdown(s)}
   ${playersTable()}
   <div class="sectiontitle" style="margin-top:32px">Возвраты и недовольные клиенты</div>
   <div class="kpis">
