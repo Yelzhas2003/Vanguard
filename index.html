@@ -393,7 +393,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 03:20</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 03:35</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1673,7 +1673,7 @@ function anRange(){
 }
 function stats(city,rng){
   const mode=cfg().accrual;
-  const cl=liveClients().filter(c=>(city==='all'||c.city===city)).filter(c=>{const d=accrualDate(c,mode);return d&&d>=rng.start&&d<=rng.end});
+  const td=today();const cl=liveClients().filter(c=>(city==='all'||c.city===city)).filter(c=>{const d=accrualDate(c,mode);return d&&d>=rng.start&&d<=rng.end&&d<=td});
   const s={clients:cl.length,cost:0,paid:0,refund:0,revenue:0,payroll:0,cexp:0,vanguard:0,gexp:0,byExam:{},byStatus:{},byEmp:{}};
   cl.forEach(c=>{const r=calcClient(c);s.cost+=r.cost;s.paid+=r.paid;s.refund+=r.refund;s.revenue+=r.revenue;s.payroll+=r.sharesTotal;s.cexp+=r.expense;s.vanguard+=r.vanguard;
     const ex=c.exam==='Другое'?'Другое':c.exam;s.byExam[ex]=(s.byExam[ex]||0)+1;s.byStatus[statusById(c.status).id]=(s.byStatus[statusById(c.status).id]||0)+1;
@@ -1725,8 +1725,9 @@ function viewAnalytics(){
     ${kpi('team','Выплаты команде',money(s.payroll),{delta:D(s.payroll,p&&p.payroll)})}${kpi('stack','Расходы (по клиентам + общие)',money(s.cexp+s.gexp),{delta:D(s.cexp+s.gexp,p&&(p.cexp+p.gexp))})}
     ${kpi('target','Доля успешных',s.success===null?'—':s.success+'%',{delta:p&&s.success!==null&&p.success!==null?s.success-p.success:p?null:undefined})}
     ${kpi('trend','Итого Vanguard (чистые)',money(s.vanguard),{delta:D(s.vanguard,p&&p.vanguard),hero:true})}${kpi('coins','После всех расходов',money(s.net),{delta:D(s.net,p&&p.net)})}
+    ${(()=>{const td=today();const w=liveClients().filter(c=>!c.archived&&!isClosed(c)&&(S.an.city==='all'||!S.an.city||c.city===S.an.city)&&(!c.examDate||c.examDate>td));return kpi('clock','Ожидается',money(w.reduce((x,c)=>x+calcClient(c).cost,0)),{sub:w.length?'клиентов: '+w.length+' — экзамен ещё впереди или без даты':'всё уже посчитано'})})()}
   </div>
-  ${p?`<div class="tiny muted" style="margin:-12px 0 16px">Стрелки — изменение к прошлому периоду (${dshow(pr.start)} – ${dshow(pr.end)})</div>`:''}
+  <div class="tiny muted" style="margin:-12px 0 16px">Клиент считается в выручку только когда наступил день экзамена.${p?` Стрелки — изменение к прошлому периоду (${dshow(pr.start)} – ${dshow(pr.end)})`:''}</div>
   <div class="charts">
     <div class="chartbox" style="grid-column:1/-1"><div class="row"><h3 class="grow">Выручка и чистые</h3><div class="tabs"><button data-anser="decade" class="${a.series==='decade'?'on':''}">По 10-дневкам</button><button data-anser="month" class="${a.series==='month'?'on':''}">По месяцам</button></div></div>
       <div class="small muted">Чистые — после долей команды, расходов по клиентам и общих расходов</div><div class="cv"><canvas id="ch-time"></canvas></div></div>
@@ -1949,10 +1950,10 @@ function saleDate(c){return c.examDate||''}
 function salesStats(rng,city){
   const inR=d=>d&&d>=rng.start&&d<=rng.end;
   const leads=liveLeads().filter(l=>(city==='all'||l.city===city)&&inR(leadDate(l)));
-  const sales=liveClients().filter(c=>(city==='all'||c.city===city)&&inR(saleDate(c)));
+  const td=today();const sales=liveClients().filter(c=>(city==='all'||c.city===city)&&inR(saleDate(c))&&saleDate(c)<=td);
   const s={leads:leads.length,booked:leads.filter(l=>l.status==='booked').length,lost:leads.filter(l=>l.status==='lost').length,open:leads.filter(l=>l.status==='new'||l.status==='pending').length,
     sales:sales.length,sum:sales.reduce((a,c)=>a+calcClient(c).cost,0),bySeller:{},bySrc:{},reasons:{},byCity:{}};
-  const pend=liveClients().filter(c=>!c.archived&&!c.examDate&&!isClosed(c)&&(city==='all'||c.city===city));s.pendN=pend.length;s.pendSum=pend.reduce((a,c)=>a+calcClient(c).cost,0);
+  const pend=liveClients().filter(c=>!c.archived&&(!c.examDate||c.examDate>td)&&!isClosed(c)&&(city==='all'||c.city===city));s.pendFut=pend.filter(c=>c.examDate).length;s.pendN=pend.length;s.pendSum=pend.reduce((a,c)=>a+calcClient(c).cost,0);
   s.avg=s.sales?Math.round(s.sum/s.sales):0;s.conv=s.leads?Math.round(s.booked/s.leads*100):null;
   const B=id=>s.bySeller[id||'']||(s.bySeller[id||'']={leads:0,booked:0,lost:0,sales:0,sum:0,good:0,bad:0});
   leads.forEach(l=>{const b=B(l.sellerId);b.leads++;if(l.status==='booked')b.booked++;if(l.status==='lost')b.lost++;
@@ -1978,7 +1979,7 @@ function viewSales(){
     ${kpi('frown','Отказов',nfmt(s.lost),{...D('lost')})}
     ${kpi('doc','Экзаменов',nfmt(s.sales),{...D('sales'),sub:'по дате экзамена'})}
     ${kpi('coins','Сумма продаж',money(s.sum),{...D('sum'),hero:true,sub:'по дате экзамена'})}
-    ${kpi('trend','Средний чек',money(s.avg),{...D('avg')})}${kpi('clock','Ожидается',money(s.pendSum),{sub:s.pendN?'броней без даты экзамена: '+s.pendN:'все брони с датой'})}</div>
+    ${kpi('trend','Средний чек',money(s.avg),{...D('avg')})}${kpi('clock','Ожидается',money(s.pendSum),{sub:s.pendN?'клиентов: '+s.pendN+(s.pendFut?' (экзамен впереди: '+s.pendFut+')':'')+' — посчитаются в день экзамена':'всё уже посчитано'})}</div>
     ${prev?`<div class="tiny muted" style="margin:-12px 0 16px">Лиды, брони и отказы — по дате заявки; деньги — по дате экзамена. Стрелки — изменение к прошлому месяцу</div>`:''}
     <div class="charts">
       <div class="chartbox"><h3>Продажи по месяцам</h3><div class="small muted">Сумма по дате экзамена, последние 6 месяцев</div><div class="cv"><canvas id="ch-sl-time"></canvas></div></div>
