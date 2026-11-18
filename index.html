@@ -390,7 +390,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 15.11 · 04:15</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 02:55</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -435,6 +435,8 @@ function isoDate(y,m,d){return y+'-'+pad(m)+'-'+pad(d)}
 /* Расчёт по клиенту — строго по ТЗ, п. 6 */
 function isNoPayE(E){return E.noPay===undefined?(E.name||'').trim().toLowerCase()==='ардак':!!E.noPay}
 function isNoPay(id){const e=id&&typeof S!=='undefined'&&S.emps&&S.emps[id];if(!e)return false;return e.noPay===undefined?(e.name||'').trim().toLowerCase()==='ардак':!!e.noPay}
+function rtAmounts(rt,fee){if(rt.splitMode==='sum')return {t:Math.round(num(rt.tSum)),h:Math.round(num(rt.hSum)),v:Math.round(num(rt.vSum))};
+  return {t:Math.round(fee*num(rt.tPct)/100),h:Math.round(fee*num(rt.hPct)/100),v:Math.round(fee*num(rt.vPct)/100)}}
 function calcClient(c){
   const cost=Math.round(num(c.cost));
   const pct=num(c.paidPct);
@@ -451,7 +453,7 @@ function calcClient(c){
   if(c.techId) add(c.techId,'tech',r.tech);
   if(c.soldBy && c.soldBy!=='self') add(c.soldBy,'sales',r.sales);
   (r.extras||[]).forEach(x=>{if(x&&x.empId) add(x.empId,'extra',x.pct,x.ruleId)});
-  if(split){[[c.teacherId,'teacher',c.retake.tPct],[c.techId,'tech',c.retake.hPct]].forEach(([id,role,p])=>{p=isNoPay(id)?0:num(p);if(id&&p)shares.push({empId:id,role,pct:p,amount:Math.round(fee*p/100),ruleId:null,retake:true})})}
+  if(split){const A=rtAmounts(c.retake,fee);[[c.teacherId,'teacher',A.t],[c.techId,'tech',A.h]].forEach(([id,role,a])=>{a=isNoPay(id)?0:a;if(id&&a)shares.push({empId:id,role,pct:fee?Math.round(a/fee*1000)/10:0,amount:a,ruleId:null,retake:true})})}
   const sharesTotal=shares.reduce((s,x)=>s+x.amount,0);
   const rexp=c.retake&&c.retake.kind==='expense'?Math.round(num(c.retake.fee)):0;
   const expense=Math.round(num(c.expense))+rexp;
@@ -1016,7 +1018,7 @@ function pairPicker(key){
   const prefT=fT,prefU=fU;
   const isPref=o=>prioScore(o,F.city);const P=prioOf(F.city);const full=(P.teacher?2:0)+(P.tech?1:0);const isTop=o=>full>0&&prioScore(o,F.city)===full;const st=id=>id&&(id===P.teacher||id===P.tech)?'★ ':'';
   PICK[key]=list;
-  if(!list.length&&(fT||fU))return `<div class="info" style="margin-top:8px">У ${esc([fT?empName(fT):'',fU?empName(fU):''].filter(Boolean).join(' + '))} нет общего свободного времени на ${cfg().sessionMin/60} ч в ближайшие 5 недель. Выберите «— любой —» или другого игрока.</div>`;
+  if(!list.length&&(fT||fU))return `<div class="info" style="margin-top:8px">У ${esc([fT?empName(fT):'',fU?empName(fU):''].filter(Boolean).join(' + '))} нет общего свободного времени в ближайшие 5 недель. Выберите «— любой —» или другого игрока.</div>`;
   if(!list.length)return `<div class="info" style="margin-top:8px">В городе ${esc(CITY_NAME[F.city])} нет совпадений: тех специалист и учитель должны оба быть свободны ${cfg().sessionMin/60} ч подряд. Игроки добавляют слоты в «Моём кабинете» или в «Расписании» → «+ Добавить слот».</div>`;
   const byDate={};list.forEach((o,i)=>(byDate[o.date]=byDate[o.date]||[]).push([o,i]));
   return `<div class="tiny muted" style="margin-top:8px">${fT&&fU?'Показано время только связки '+esc(pairName({techId:fT,teacherId:fU})):fT?'Тех специалист '+esc(empName(fT))+' со всеми учителями':fU?'Учитель '+esc(empName(fU))+' со всеми тех специалистами':'Все возможные связки города'} — меняется полями «Учитель» и «Тех специалист» выше.${P.teacher||P.tech?` <span style="color:var(--prio)">★ — приоритет в ${esc(CITY_NAME[F.city])}: ${esc([P.teacher?empName(P.teacher):'',P.tech?empName(P.tech):''].filter(Boolean).join(', '))}</span>`:''}</div>
@@ -1147,14 +1149,14 @@ function drawClientForm(){
       <div class="row"><b class="grow">Пересдача</b>${c.status!=='retake'?'<button type="button" class="btn sm danger" data-act="dropRetake">Убрать пересдачу</button>':''}</div>
       <div class="field" style="margin-top:10px">${seg('rkind',[{id:'free',name:'Бесплатная'},{id:'paid',name:'Платная'},{id:'expense',name:'Расходная (платим мы)'}],rt?(rt.kind==='other'?'':rt.kind):'free')}</div>
       ${rt&&rt.kind==='paid'?`<div class="field"><label class="lbl">Клиент доплачивает, ₸ <span class="muted">(добавится к выручке)</span></label><input class="input num" id="rt-fee" inputmode="numeric" value="${rt.fee===''?'':nfmt(num(rt.fee))}" style="max-width:240px"></div>
-        ${(()=>{const fee=num(rt.fee);if(!('tPct' in rt)){rt.tPct='';rt.hPct='';rt.vPct=''}const amt=p=>fee&&p!==''?' · '+money(Math.round(fee*num(p)/100)):'';
-          const sum=num(rt.tPct)+num(rt.hPct)+num(rt.vPct);const filled=rt.tPct!==''||rt.hPct!==''||rt.vPct!=='';
-          const inp=(id,v)=>`<input class="input num" id="${id}" inputmode="numeric" value="${v}" placeholder="0" style="width:70px;min-height:34px;padding:5px 8px">`;
-          return `<div class="field"><label class="lbl">Как делим платную пересдачу <span style="color:var(--danger)">*</span></label><div class="row" style="gap:14px;align-items:center">
-            <label class="small" style="display:flex;align-items:center;gap:6px">Учителю ${inp('rt-t',rt.tPct)} %<span class="muted" id="rt-ta">${amt(rt.tPct)}</span></label>
-            <label class="small" style="display:flex;align-items:center;gap:6px">Тех специалисту ${inp('rt-h',rt.hPct)} %<span class="muted" id="rt-ha">${amt(rt.hPct)}</span></label>
-            <label class="small" style="display:flex;align-items:center;gap:6px"><b>Vanguard (чистыми)</b> ${inp('rt-v',rt.vPct)} %<span class="muted" id="rt-va">${amt(rt.vPct)}</span></label></div>
-            <div class="tiny" id="rt-sum" style="margin-top:4px;${filled&&sum!==100?'color:var(--danger)':'color:var(--muted)'}">Всего: ${sum}%${sum!==100?' — должно быть ровно 100%':' ✓'}. Заполняется вручную для каждого клиента.</div></div>`})()}`:''}
+        ${(()=>{const fee=num(rt.fee);if(!('tPct' in rt)){rt.tPct='';rt.hPct='';rt.vPct=''}const sm=rt.splitMode==='sum';
+          const inp=(id,v)=>`<input class="input num" id="${id}" inputmode="numeric" value="${v}" placeholder="0" style="width:${sm?110:70}px;min-height:34px;padding:5px 8px">`;
+          const f=k=>sm?(rt[k+'Sum']===''||rt[k+'Sum']===undefined?'':nfmt(num(rt[k+'Sum']))):rt[k+'Pct'];const u=sm?'₸':'%';
+          return `<div class="field"><label class="lbl" style="display:flex;align-items:center;gap:10px">Как делим платную пересдачу <span style="color:var(--danger)">*</span>${seg('rtmode',[{id:'pct',name:'в %'},{id:'sum',name:'в ₸'}],sm?'sum':'pct')}</label><div class="row" style="gap:14px;align-items:center">
+            <label class="small" style="display:flex;align-items:center;gap:6px">Учителю ${inp('rt-t',f('t'))} ${u}<span class="muted" id="rt-ta"></span></label>
+            <label class="small" style="display:flex;align-items:center;gap:6px">Тех специалисту ${inp('rt-h',f('h'))} ${u}<span class="muted" id="rt-ha"></span></label>
+            <label class="small" style="display:flex;align-items:center;gap:6px"><b>Vanguard (чистыми)</b> ${inp('rt-v',f('v'))} ${u}<span class="muted" id="rt-va"></span></label></div>
+            <div class="tiny" id="rt-sum" style="margin-top:4px"></div></div>`})()}`:''}
       ${rt&&rt.kind==='expense'?`<div class="field"><label class="lbl">Стоимость экзамена за наш счёт, ₸ <span class="muted">(уйдёт в расходы по клиенту)</span></label><input class="input num" id="rt-fee" inputmode="numeric" value="${rt.fee===''?'':nfmt(num(rt.fee))}" style="max-width:240px"></div>`:''}
       <div class="field"><label class="lbl">Дата пересдачи</label>${dateBlock('retake')}</div>
       <div class="field" style="margin-bottom:0"><label class="lbl">Комментарий к пересдаче</label><textarea class="input" id="rt-comment" rows="2">${esc(rt?rt.comment:'')}</textarea></div>
@@ -1210,10 +1212,14 @@ function drawClientForm(){
   const nsc=box.closest('.modal').querySelector('.mb');if(nsc)nsc.scrollTop=top;
   bindClientForm(box);
 }
-function rtSplitInfo(){const rt=F&&F.retake;if(!rt||!$('#rt-sum'))return;const fee=num(rt.fee);const amt=p=>fee&&p!==''?' · '+money(Math.round(fee*num(p)/100)):'';
-  $('#rt-ta').textContent=amt(rt.tPct);$('#rt-ha').textContent=amt(rt.hPct);$('#rt-va').textContent=amt(rt.vPct);
-  const sum=num(rt.tPct)+num(rt.hPct)+num(rt.vPct);const filled=rt.tPct!==''||rt.hPct!==''||rt.vPct!=='';const el=$('#rt-sum');
-  el.textContent='Всего: '+sum+'%'+(sum!==100?' — должно быть ровно 100%':' ✓')+'. Заполняется вручную для каждого клиента.';el.style.color=filled&&sum!==100?'var(--danger)':'var(--muted)'}
+function rtSplitInfo(){const rt=F&&F.retake;if(!rt||!$('#rt-sum'))return;const fee=num(rt.fee);const sm=rt.splitMode==='sum';
+  const K=['t','h','v'];const filled=K.some(k=>sm?(rt[k+'Sum']!==''&&rt[k+'Sum']!==undefined):rt[k+'Pct']!=='');
+  K.forEach(k=>{const el=$('#rt-'+k+'a');if(!el)return;const has=sm?(rt[k+'Sum']!==''&&rt[k+'Sum']!==undefined):rt[k+'Pct']!=='';
+    el.textContent=!fee||!has?'':sm?' · '+(Math.round(num(rt[k+'Sum'])/fee*1000)/10)+'%':' · '+money(Math.round(fee*num(rt[k+'Pct'])/100))});
+  const el=$('#rt-sum');let ok,txt;
+  if(sm){const tot=K.reduce((a,k)=>a+Math.round(num(rt[k+'Sum'])),0);ok=tot===fee;txt='Всего: '+money(tot)+' из '+money(fee)+(ok?' ✓':tot>fee?' — больше на '+money(tot-fee):' — не хватает '+money(fee-tot))}
+  else{const sum=K.reduce((a,k)=>a+num(rt[k+'Pct']),0);ok=sum===100;txt='Всего: '+sum+'%'+(ok?' ✓':' — должно быть ровно 100%')}
+  el.textContent=txt+'. Заполняется вручную для каждого клиента.';el.style.color=filled&&!ok?'var(--danger)':'var(--muted)'}
 function drawCalc(){
   const el=$('#calcbox');if(!el||!F)return;
   const r=calcClient(F);const own=isOwner();const me=myEmp();
@@ -1227,7 +1233,7 @@ function drawCalc(){
    ${r.refund?`<div class="cl"><span>Возврат</span><span>− ${money(r.refund)}</span></div>`:''}
    <div class="cl"><span><b>Общая выручка</b></span><span>${money(r.revenue)}</span></div>
    ${lines}
-   ${r.split?`<div class="cl"><span>Пересдача — Vanguard <span class="muted">${num(F.retake.vPct)}% от ${money(r.fee)}</span></span><span>${money(Math.round(r.fee*num(F.retake.vPct)/100))}</span></div>`:''}
+   ${r.split?(()=>{const v=rtAmounts(F.retake,r.fee).v;return `<div class="cl"><span>Пересдача — Vanguard <span class="muted">${r.fee?Math.round(v/r.fee*1000)/10:0}% от ${money(r.fee)}</span></span><span>${money(v)}</span></div>`})():''}
    ${multi.map(([id,v])=>`<div class="cl small muted"><span>${esc(empName(id))} всего (несколько ролей)</span><span>${money(v)}</span></div>`).join('')}
    ${r.expense-r.rexp?`<div class="cl"><span>Расходы по клиенту</span><span>− ${money(r.expense-r.rexp)}</span></div>`:''}
    ${r.rexp?`<div class="cl"><span>Расходная пересдача (за наш счёт)</span><span>− ${money(r.rexp)}</span></div>`:''}
@@ -1255,6 +1261,8 @@ function bindClientForm(box){
       applyRates(['teacher','tech','sales'])}
     else if(k==='status')setFormStatus(v);
     else if(k==='dreason')F.decideReason=v;
+    else if(k==='rtmode'){const rt=F.retake;if(rt){const fee=num(rt.fee);if(v==='sum'&&rt.splitMode!=='sum'){['t','h','v'].forEach(x=>rt[x+'Sum']=rt[x+'Pct']===''?'':Math.round(fee*num(rt[x+'Pct'])/100))}
+      if(v==='pct'&&rt.splitMode==='sum'){['t','h','v'].forEach(x=>rt[x+'Pct']=rt[x+'Sum']===''||rt[x+'Sum']===undefined||!fee?'':Math.round(num(rt[x+'Sum'])/fee*1000)/10)}rt.splitMode=v;drawClientForm()}}
     else if(k==='dmode'){F.dateMode=v;if(v!=='slot'){F.slotId='';F.sess=null}if(v==='tbd'){F.examDate='';F.examTime=''}}
     else if(k==='rdmode'){F.retake.dateMode=v;if(v!=='slot'){F.retake.slotId='';F.retake.sess=null}if(v==='tbd'){F.retake.date='';F.retake.time=''}}
     else if(k==='rkind'){F.retake.kind=v;F.retake.fee='';if(v==='paid'){F.retake.tPct='';F.retake.hPct='';F.retake.vPct=''}recalcRefund()}
@@ -1282,7 +1290,11 @@ function bindClientForm(box){
   moneyIn('c-cost',()=>F.cost,v=>F.cost=v);moneyIn('c-refund',()=>F.refund,v=>F.refund=v);moneyIn('c-expense',()=>F.expense,v=>F.expense=v);
   moneyIn('rt-fee',()=>F.retake.fee,v=>F.retake.fee=v);
   {const f=$('#rt-fee',box);if(f&&F.retake&&F.retake.kind==='paid')f.addEventListener('input',()=>rtSplitInfo())}
-  [['rt-t','tPct'],['rt-h','hPct'],['rt-v','vPct']].forEach(([id,k])=>{const el=$('#'+id,box);if(!el)return;el.oninput=()=>{const t=el.value.replace(/[^\d.]/g,'');F.retake[k]=t===''?'':Math.min(100,Math.max(0,num(t)));drawCalc();rtSplitInfo()}});
+  if(F.retake&&F.retake.kind==='paid'){const sm=F.retake.splitMode==='sum';
+    [['rt-t','t'],['rt-h','h'],['rt-v','v']].forEach(([id,k])=>{const el=$('#'+id,box);if(!el)return;
+      if(sm){el.oninput=()=>{const t=el.value.replace(/[^\d]/g,'');F.retake[k+'Sum']=t===''?'':num(t);drawCalc();rtSplitInfo()};el.onblur=()=>{if(el.value!=='')el.value=nfmt(num(F.retake[k+'Sum']))};el.onfocus=()=>el.select()}
+      else el.oninput=()=>{const t=el.value.replace(/[^\d.]/g,'');F.retake[k+'Pct']=t===''?'':Math.min(100,Math.max(0,num(t)));drawCalc();rtSplitInfo()}});
+    rtSplitInfo()}
   const rp=$('#c-refundPct',box);if(rp)rp.oninput=()=>{F.refundPct=Math.min(100,Math.max(0,num(rp.value)));recalcRefund();drawCalc()};
   $$('[data-part]',box).forEach(el=>el.onchange=()=>{F.payParts[Number(el.dataset.part)]=el.checked;F.paidPct=pctFromParts(F.payPlan,F.payParts);recalcRefund();drawCalc()});
   const pp=$('#c-paidPct',box);if(pp)pp.oninput=()=>{F.paidPct=Math.min(100,Math.max(0,num(pp.value)));recalcRefund();drawCalc()};
@@ -1315,7 +1327,9 @@ async function saveClient(){
   if(c.status==='decide'&&!c.decideReason){toast('«Нужно решить»: укажите, что случилось');return}
   if(c.status==='process'&&!(c.dateMode==='slot'?c.sess||c.slotId:c.dateMode==='manual'&&c.examDate)){toast('Для «Дата утверждена» выберите дату и время');const el=$('#dateblock');if(el)el.scrollIntoView({block:'center'});return}
   if(c.status==='retake'&&(!c.retake||!['paid','free','expense'].includes(c.retake.kind))){toast('Выберите вид пересдачи');return}
-  if(c.retake&&c.retake.kind==='paid'&&num(c.retake.fee)&&('tPct' in c.retake)&&num(c.retake.tPct)+num(c.retake.hPct)+num(c.retake.vPct)!==100){toast('Платная пересдача: учитель + тех + Vanguard должно быть 100%');$('#rt-t')&&$('#rt-t').focus();return}
+  if(c.retake&&c.retake.kind==='paid'&&num(c.retake.fee)&&('tPct' in c.retake)){const rt=c.retake,fee=Math.round(num(rt.fee));
+    if(rt.splitMode==='sum'){const tot=['t','h','v'].reduce((a,k)=>a+Math.round(num(rt[k+'Sum'])),0);if(tot!==fee){toast('Платная пересдача: учитель + тех + Vanguard должно быть ровно '+money(fee));$('#rt-t')&&$('#rt-t').focus();return}}
+    else if(num(rt.tPct)+num(rt.hPct)+num(rt.vPct)!==100){toast('Платная пересдача: учитель + тех + Vanguard должно быть 100%');$('#rt-t')&&$('#rt-t').focus();return}}
   if(c.retake&&c.retake.kind==='expense'&&!num(c.retake.fee)){toast('Укажите стоимость расходной пересдачи');$('#rt-fee')&&$('#rt-fee').focus();return}
   if(c.status==='closed'){const cl=c.closed||{};
     if(!cl.outcome){toast('Отметьте: клиент доволен или нужен возврат');return}
@@ -1329,7 +1343,7 @@ async function saveClient(){
   if(c.retake&&c.retake.dateMode==='slot'&&!chk(c.retake.sess,old&&old.retake&&old.retake.sessionId)){toast('Время пересдачи у связки уже занято — выберите другое');F.retake.sess=null;drawClientForm();return}
   if(c.sess&&c.retake&&c.retake.sess&&sameOpt(c.sess,c.retake.sess)){toast('Для пересдачи выберите другое время');return}
   const mainSess=c.dateMode==='slot'?c.sess:null;const rtSess=c.retake&&c.retake.dateMode==='slot'?c.retake.sess:null;
-  const rt=c.retake?{kind:c.retake.kind||'free',fee:(c.retake.kind==='paid'||c.retake.kind==='expense')?Math.round(num(c.retake.fee)):0,...(c.retake.kind==='paid'&&('tPct' in c.retake)?{tPct:num(c.retake.tPct),hPct:num(c.retake.hPct),vPct:num(c.retake.vPct)}:{}),comment:String(c.retake.comment||'').trim(),
+  const rt=c.retake?{kind:c.retake.kind||'free',fee:(c.retake.kind==='paid'||c.retake.kind==='expense')?Math.round(num(c.retake.fee)):0,...(c.retake.kind==='paid'&&('tPct' in c.retake)?{tPct:num(c.retake.tPct),hPct:num(c.retake.hPct),vPct:num(c.retake.vPct),splitMode:c.retake.splitMode==='sum'?'sum':'pct',...(c.retake.splitMode==='sum'?{tSum:Math.round(num(c.retake.tSum)),hSum:Math.round(num(c.retake.hSum)),vSum:Math.round(num(c.retake.vSum))}:{})}:{}),comment:String(c.retake.comment||'').trim(),
     dateMode:rtSess||c.retake.slotId?'slot':(c.retake.date?'manual':'tbd'),slotId:rtSess?'':(c.retake.slotId||''),sessionId:'',date:c.retake.date||'',time:c.retake.time||''}:null;
   const data={name:c.name.trim(),address:String(c.address||'').trim(),exam:c.exam,examOther:c.exam==='Другое'?String(c.examOther||'').trim():'',city:c.city,
     dateMode:c.dateMode,slotId:c.dateMode==='slot'&&!mainSess?(c.slotId||''):'',sessionId:'',examDate:c.dateMode==='tbd'?'':(c.examDate||''),examTime:c.dateMode==='tbd'?'':(c.examTime||''),payDate:c.payDate||'',
