@@ -393,7 +393,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 05:35</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 06:10</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -648,8 +648,8 @@ function writeErr(e){
   else if(code==='resource_exhausted')toast('Слишком много действий подряд, подождите пару секунд');
   else toast('Не удалось сохранить, попробуйте ещё раз');
 }
-function setDoc(path,data){return q(path,()=>S.db.doc(path).set(data))}
-function updDoc(path,data){return q(path,()=>S.db.doc(path).update(data))}
+function setDoc(path,data){logWrite(path,data,true);return q(path,()=>S.db.doc(path).set(data))}
+function updDoc(path,data){logWrite(path,data,false);return q(path,()=>S.db.doc(path).update(data))}
 function newId(col){return S.db.collection(BASE+'/'+col).doc().id}
 
 /* ---------- toasts, modals ---------- */
@@ -749,7 +749,7 @@ const ROUTES=[
   {grp:'Продажи'},
   {id:'leads',name:'Лиды',ic:'funnel'},{id:'sales',name:'Аналитика продаж',ic:'trend',own:1},
   {grp:'Финансы',own:1},
-  {id:'analytics',name:'Аналитика',ic:'chart',own:1},{id:'expenses',name:'Расходы',ic:'receipt',own:1},{id:'settings',name:'Настройки',ic:'gear',own:1}];
+  {id:'analytics',name:'Аналитика',ic:'chart',own:1},{id:'expenses',name:'Расходы',ic:'receipt',own:1},{id:'journal',name:'Журнал изменений',ic:'clock',own:1},{id:'settings',name:'Настройки',ic:'gear',own:1}];
 function routeOk(id){const r=ROUTES.find(x=>x.id===id);return r&&r.id&&(!r.own||isOwner())&&(!r.me||!!myEmp())}
 function homeRoute(){return !isOwner()&&myEmp()?'me':'astana'}
 function readHash(){const h=location.hash.replace('#','');S.route=routeOk(h)?h:(S.route&&S.route!=='astana'&&routeOk(S.route)?S.route:homeRoute())}
@@ -794,6 +794,7 @@ function render(){
   else if(r==='expenses')html=viewExpenses();
   else if(r==='settings')html=viewSettings();
   else if(r==='leads')html=viewLeads();
+  else if(r==='journal')html=viewJournal();
   else if(r==='sales')html=viewSales();
   if(!S.canWrite)html='<div class="note">Режим просмотра: у вашего доступа нет прав на изменение данных.</div>'+html;
   if(ownerSetupMode()&&(r==='staff'||r==='settings'))html='<div class="note"><b>Первая настройка.</b> Пока ни один тренер не привязан, любой вошедший видит всё. Добавьте себя в «Игроки» с галочкой «Тренер» и своим логином <b>'+esc(emailToLogin(S.email))+'</b> — после этого остальные будут видеть только своё.</div>'+html;
@@ -806,6 +807,7 @@ function render(){
   if(r==='me'){const mp=$('#me-photo',v);const me=myEmp();if(mp&&me)mp.onchange=()=>photoFromFile(mp.files[0],async d=>{try{await updDoc(BASE+'/employees/'+me.id,{photo:d,updatedAt:nowIso()});toast('Фото обновлено')}catch(e){}});
     const rm=$('[data-act="rmPhoto"]',v);if(rm&&me)rm.onclick=async e=>{e.preventDefault();try{await updDoc(BASE+'/employees/'+me.id,{photo:'',updatedAt:nowIso()});toast('Фото убрано')}catch(x){}}}
   if(r==='leads')bindLeads(v);
+  if(r==='journal')bindJournal(v);
   if(r==='sales'){bindSales(v);drawSales()}
 }
 
@@ -2091,6 +2093,55 @@ function bindLeads(v){
   }
 }
 
+/* ===== ЖУРНАЛ ИЗМЕНЕНИЙ ===== */
+const LOG_MAX=500;
+const LOG_AREA={clients:'Клиенты',leads:'Лиды',employees:'Игроки',expenses:'Расходы',payments:'Выплаты',schedule:'Расписание',config:'Настройки',periods:'Периоды',viewers:'Доступ'};
+const LOG_FIELDS={...FIELD_LABELS,retake:'пересдача',closed:'итог сделки',rates:'ставки',decideReason:'что случилось',decideNote:'комментарий «нужно решить»',archived:'архив',deleted:'удаление',offers:'предложенные даты',source:'источник',sellerId:'продажник',nextAt:'когда связаться',lostReason:'причина отказа',lostComment:'комментарий к отказу',clientId:'бронь',phone:'телефон',amount:'сумма',date:'дата',category:'категория',start:'время',dur:'длительность',playerId:'игрок',roles:'роли',rolesByCity:'роли по городам',photo:'фото',active:'статус',email:'логин',noPay:'не получает проценты',noSales:'без % за продажу',priority:'приоритет в связках',statuses:'этапы',accrual:'дата в аналитике',byEmp:'выплаты',refundPct:'% возврата',refundComment:'комментарий к возврату'};
+const LOG_SKIP=new Set(['refundMode','payParts','sessionId','slotId','_leadId','leadId','dateMode','imported','updatedAt','updatedBy','history','createdAt','createdBy','statusAt','expiresAt','offerExpiresAt','sess','_orig','priorityV','statusesV']);
+function logName(col,id,doc){if(col==='clients'||col==='leads'||col==='employees')return (doc&&doc.name)||'';
+  if(col==='schedule'){const x=doc||{};const c=x.clientId&&S.clients[x.clientId];return [x.date?dshow(x.date):'',x.start||'',x.type==='slot'?'слот '+(x.playerId?empName(x.playerId):''):'',c?c.name:''].filter(Boolean).join(' · ')}
+  if(col==='expenses')return (doc&&(doc.title||doc.category||''))+(doc&&doc.amount?' · '+money(doc.amount):'');
+  if(col==='payments')return periodLabel?(()=>{try{return periodLabel(id)}catch(e){return id}})():id;
+  return ''}
+function logAction(col,old,data,isSet){
+  if(!old)return 'создано';
+  if(data.deleted===true&&!old.deleted)return 'удалено';
+  if(data.deleted===false&&old.deleted)return 'восстановлено';
+  if('archived' in data&&!!data.archived!==!!old.archived)return data.archived?'в архив':'из архива';
+  const parts=[];
+  if('status' in data&&data.status!==old.status){const nm=x=>col==='clients'?statusById(x).name:col==='leads'?leadSt(x).name:x;parts.push('этап: '+nm(old.status)+' → '+nm(data.status))}
+  const keys=Object.keys(data).filter(k=>!LOG_SKIP.has(k)&&k!=='status'&&JSON.stringify(old[k]??'')!==JSON.stringify(data[k]??''));
+  if(isSet)Object.keys(old).forEach(k=>{if(!(k in data)&&!LOG_SKIP.has(k)&&old[k]!==undefined&&old[k]!==''&&old[k]!==null&&!keys.includes(k))keys.push(k)});
+  if(keys.length)parts.push('изменено: '+keys.slice(0,6).map(k=>LOG_FIELDS[k]||k).join(', ')+(keys.length>6?' и ещё '+(keys.length-6):''));
+  return parts.join('; ')}
+function logWrite(path,data,isSet){
+  try{if(!S.db||!path.startsWith(BASE+'/')||path.startsWith(BASE+'/log/'))return;
+    const rest=path.slice(BASE.length+1).split('/');const col=rest[0],id=rest[1];if(!LOG_AREA[col])return;
+    const map={clients:'clients',leads:'leads',employees:'emps',expenses:'expenses',payments:'payments',schedule:'sched',periods:'periods',viewers:'viewers'};
+    const old=col==='config'?S.config:(S[map[col]]||{})[id];
+    const action=logAction(col,old?JSON.parse(JSON.stringify(old)):null,data,isSet);if(!action)return;
+    const name=logName(col,id,{...(old||{}),...data});
+    const lid=S.db.collection(BASE+'/log').doc().id;
+    S.db.doc(BASE+'/log/'+lid).set({at:nowIso(),by:S.uid||'',who:(myEmp()&&myEmp().name)||accName(S.uid),area:col,ref:id||'',name,action}).then(logPrune).catch(()=>{})}catch(e){}}
+let _pruning=false;
+async function logPrune(){if(_pruning)return;const all=Object.entries(S.log||{});if(all.length<=LOG_MAX+20)return;_pruning=true;
+  try{const old=all.sort((a,b)=>String(a[1].at).localeCompare(String(b[1].at))).slice(0,all.length-LOG_MAX);for(const [id] of old)await S.db.doc(BASE+'/log/'+id).delete()}catch(e){}finally{_pruning=false}}
+function journalRows(){
+  const L=Object.values(S.log||{}).map(x=>({...x,src:'log'}));
+  const first=L.reduce((m,x)=>!m||x.at<m?x.at:m,'');
+  const H=[];Object.values(S.clients||{}).forEach(cl=>(cl.history||[]).forEach(h=>{if(!first||h.at<first)H.push({at:h.at,by:h.by,who:accName(h.by),area:'clients',ref:cl.id,name:cl.name,action:h.action,src:'hist'})}));
+  return L.concat(H).sort((a,b)=>String(b.at).localeCompare(String(a.at))).slice(0,LOG_MAX)}
+function viewJournal(){
+  if(!S.jr)S.jr={area:'',q:''};const J=S.jr;const q=J.q.trim().toLowerCase();
+  const rows=journalRows().filter(r=>(!J.area||r.area===J.area)&&(!q||(r.name+' '+r.action+' '+r.who).toLowerCase().includes(q)));
+  const t=iso=>{const d=new Date(iso);return isNaN(d)?'':pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'+d.getFullYear()+' '+pad(d.getHours())+':'+pad(d.getMinutes())};
+  return `<div class="toolbar"><select class="select" id="jr-area"><option value="">Все разделы</option>${Object.entries(LOG_AREA).map(([k,v])=>`<option value="${k}" ${J.area===k?'selected':''}>${v}</option>`).join('')}</select>
+    <input class="input" id="jr-q" placeholder="Поиск: имя, действие, кто…" value="${esc(J.q)}" style="min-width:240px"><div class="grow"></div><span class="small muted">Последние ${LOG_MAX} изменений · показано ${rows.length}</span></div>
+  ${rows.length?`<div class="tablewrap"><table class="t"><thead><tr><th>Когда</th><th>Кто</th><th>Раздел</th><th>Что</th><th>Действие</th></tr></thead><tbody>
+  ${rows.map(r=>`<tr ${r.area==='clients'&&S.clients[r.ref]&&!S.clients[r.ref].deleted?`data-cid="${r.ref}" style="cursor:pointer"`:''}><td class="muted" style="white-space:nowrap">${t(r.at)}</td><td><b>${esc(r.who||accName(r.by))}</b></td><td>${esc(LOG_AREA[r.area]||r.area)}</td><td>${esc(r.name||'—')}</td><td>${esc(r.action)}</td></tr>`).join('')}
+  </tbody></table></div>`:'<div class="card empty"><b>Пока пусто</b>Здесь появятся все изменения на сайте: клиенты, лиды, игроки, расписание, выплаты, расходы, настройки.</div>'}`}
+function bindJournal(v){const a=$('#jr-area',v);if(a)a.onchange=()=>{S.jr.area=a.value;render()};const q=$('#jr-q',v);if(q)q.oninput=()=>{S.jr.q=q.value;clearTimeout(S._jq);S._jq=setTimeout(()=>{render();const e=$('#jr-q');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length)}},250)}}
+
 /* ===== НАСТРОЙКИ ===== */
 function saveConfig(patch){const c={...cfg(),...patch};return setDoc(BASE+'/config/app',{statuses:c.statuses,statusesV:5,accrual:c.accrual,rules:c.rules,sessionMin:c.sessionMin,retakeSplit:c.retakeSplit||{},priority:c.priority||null,priorityV:c.priority?2:null,updatedAt:nowIso()})}
 document.addEventListener('change',e=>{const el=e.target.closest&&e.target.closest('[data-prio]');if(!el||!isOwner())return;const [city,role]=el.dataset.prio.split('|');
@@ -2133,9 +2184,7 @@ function viewSettings(){
     <p class="tiny muted">Сменить пароль или отключить доступ — там же, в Supabase → Authentication → Users. Кто вошёл, но не указан среди игроков, увидит экран «Доступ ещё не настроен».</p>
     <div class="list">${viewers.map(u=>{const e=liveEmps().find(x=>x.userId===u);return `<div class="item"><span class="grow">${esc(accName(u))}${u===S.uid?' (вы)':''}</span>${e?`<span class="chip acc">${esc(e.name)}${(e.roles||[]).includes('owner')?' · тренер':''}</span>`:'<span class="chip">не привязан</span>'}</div>`}).join('')||'<div class="muted small">Пока никто не заходил</div>'}</div></div>
 
-  <div class="card" style="margin-top:16px"><div class="sectiontitle" style="margin-top:0">Журнал изменений клиентов</div>
-    <div class="small">${log.slice(0,100).map(h=>`<div style="padding:6px 0;border-top:1px solid var(--line)">${dshow(h.at)} ${String(h.at).slice(11,16)} · <b>${esc(accName(h.by))}</b> · ${esc(h.name)} — ${esc(h.action)}</div>`).join('')||'<div class="muted">Пока пусто</div>'}</div>
-    <p class="tiny muted">Время — UTC. Показаны последние 100 записей.</p></div>`;
+  <div class="card" style="margin-top:16px"><div class="row"><div class="sectiontitle grow" style="margin:0">Журнал изменений</div><a class="btn sm" href="#journal">Открыть журнал</a></div><p class="small muted" style="margin:8px 0 0">Последние 500 изменений на сайте — кто, когда и что поменял.</p></div>`;
 }
 function ruleText(r){const n=ruleNorm(r);return `${esc(n.cities.map(c=>CITY_NAME[c]).join(', '))}: если ${n.role==='teacher'?'учитель':'тех специалист'} = <b>${esc(empName(n.whoId))}</b>, то ${(r.targets||[]).map(t=>'<b>'+esc(empName(t.empId))+'</b> +'+t.pct+'%').join(' и ')}`}
 function openRule(id){
@@ -2741,7 +2790,7 @@ async function init(){
   SB.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT')location.reload()});
   const st=makeStore(SB);S.db=st.db;S.uid=session.user.id;S.email=(session.user.email||'').toLowerCase();S.ownerAcc=false;
   const col=(name,key)=>S.db.collection(BASE+'/'+name).onSnapshot(snap=>{const o={};snap.docs.forEach(d=>o[d.id]={id:d.id,...d.data()});S[key]=o;S.got[key]=true;S.fresh[key]=true;schedule();afterData()});
-  col('employees','emps');col('clients','clients');col('expenses','expenses');col('periods','periods');col('payments','payments');col('viewers','viewers');col('schedule','sched');col('leads','leads');
+  col('employees','emps');col('clients','clients');col('expenses','expenses');col('periods','periods');col('payments','payments');col('viewers','viewers');col('schedule','sched');col('leads','leads');col('log','log');
   S.db.doc(BASE+'/config/app').onSnapshot(d=>{S.config=d.exists?d.data():null;S.got.config=true;S.fresh.config=true;schedule();afterData()});
   try{await st.loadAll()}catch(e){
     if(e&&e.code==='invalid_argument'){await SB.auth.signOut();return}
