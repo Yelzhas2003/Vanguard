@@ -393,7 +393,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 04:30</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 05:10</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1675,6 +1675,28 @@ function anRange(){
   if(a.mode==='custom'){return {start:a.from||'2000-01-01',end:a.to||'2999-12-31'}}
   const ym=a.month||today().slice(0,7);const [y,m]=ym.split('-').map(Number);return {start:ym+'-01',end:isoDate(y,m,new Date(y,m,0).getDate())};
 }
+function fin(city,rng){
+  const inC=c=>city==='all'||!city||c.city===city;const td=today();
+  const passedBy=c=>c.examDate?(examPassed(c)&&c.examDate<=rng.end):(isClosed(c)&&closedDate(c)<=rng.end);
+  const closedIn=c=>{if(!isClosed(c))return false;const d=closedDate(c);return d&&d>=rng.start&&d<=rng.end};
+  const gross=c=>{const r=calcAt(c);return r.paid+r.fee};
+  const all=liveClients().filter(inC);
+  const bank=all.filter(c=>passedBy(c)&&(!isClosed(c)||closedDate(c)>=rng.start));
+  const closed=all.filter(closedIn);
+  const wait=all.filter(c=>!c.archived&&!isClosed(c)&&!examPassed(c));
+  const revCl=all.filter(c=>c.examDate&&c.examDate>=rng.start&&c.examDate<=rng.end&&examPassed(c));
+  const rtFee=all.filter(c=>c.retake&&c.retake.kind==='paid'&&c.retake.date>=rng.start&&c.retake.date<=rng.end&&happened(c.retake.date,c.retake.time)).reduce((a,c)=>a+Math.round(num(c.retake.fee)),0);
+  const R_=closed.map(c=>calcAt(c));
+  const gexp=Object.values(S.expenses).filter(x=>!x.deleted&&x.date>=rng.start&&x.date<=rng.end&&inC(x)).reduce((a,x)=>a+num(x.amount),0);
+  const f={bank:bank.reduce((a,c)=>a+gross(c),0),bankN:bank.length,bankList:bank,
+    closedSum:closed.reduce((a,c)=>a+gross(c),0),closedN:closed.length,closedList:closed,
+    team:R_.reduce((a,r)=>a+r.sharesTotal,0),refund:R_.reduce((a,r)=>a+r.refund,0),cexp:R_.reduce((a,r)=>a+r.expense,0),gexp,
+    waitSum:wait.reduce((a,c)=>a+calcClient(c).cost,0),waitN:wait.length,waitList:wait,
+    revenue:revCl.reduce((a,c)=>a+calcClient({...c,retake:null}).paid,0)+rtFee,revN:revCl.length,
+    potential:closed.reduce((a,c)=>{const r=c.retake&&c.retake.kind==='expense'?{...c.retake,kind:'free',fee:0}:c.retake;return a+calcAt({...c,refund:0,expense:0,retake:r}).vanguard},0)};
+  f.expenses=f.cexp+f.gexp;f.net=R_.reduce((a,r)=>a+r.vanguard,0)-gexp;f.clients=f.bankN+f.waitN;
+  const good=closed.filter(c=>closedOutcome(c)==='good').length,bad=closed.filter(c=>closedOutcome(c)==='bad').length;f.success=good+bad?Math.round(good/(good+bad)*100):null;
+  return f}
 function stats(city,rng){
   const mode=cfg().accrual;
   const td=today();const cl=liveClients().filter(c=>(city==='all'||c.city===city)).filter(c=>{const d=accrualDate(c,mode);return d&&d>=rng.start&&d<=rng.end&&(c.examDate?examPassed(c):d<=td)});
@@ -1695,6 +1717,18 @@ function stats(city,rng){
   return s;
 }
 function plural(n,a,b,c){n=Math.abs(n)%100;const n1=n%10;if(n>10&&n<20)return c;if(n1>1&&n1<5)return b;if(n1===1)return a;return c}
+function finBreakdown(f){
+  const st=c=>{const x=statusById(c.status);return `<span class="badge" style="border-color:${x.color};color:${x.color}">${esc(x.name)}</span>`};
+  const cin=new Set(f.closedList.map(c=>c.id));
+  const rows=f.bankList.slice().sort((a,b)=>(a.examDate||'').localeCompare(b.examDate||''));
+  const tbl=(title,key,list,cols)=>`<details class="card" style="margin-top:12px;padding:0" ${S.an['o_'+key]?'open':''} ontoggle="S.an['o_${key}']=this.open"><summary style="padding:14px 18px;cursor:pointer;font-weight:700">${title} <span class="muted small" style="font-weight:400">(нажмите, чтобы раскрыть)</span></summary>
+    <div class="tablewrap" style="border:0;border-radius:0"><table class="t"><thead><tr><th>#</th><th>Клиент</th><th>Город</th><th>Экзамен</th><th>Статус</th>${cols.map(x=>`<th class="r">${x[0]}</th>`).join('')}</tr></thead><tbody>
+    ${list.map((c,i)=>`<tr data-cid="${c.id}" style="cursor:pointer"><td class="muted">${i+1}</td><td><b>${esc(c.name||'—')}</b></td><td>${esc(CITY_NAME[c.city]||'')}</td><td>${c.examDate?dshow(c.examDate)+(c.examTime?' '+c.examTime:''):'<span class="muted">не выбрана</span>'}</td><td>${st(c)}</td>${cols.map(x=>`<td class="r">${x[1](c)}</td>`).join('')}</tr>`).join('')}
+    </tbody></table></div></details>`;
+  const g=c=>{const r=calcAt(c);return r.paid+r.fee};
+  return tbl(`Банк Vanguard — ${f.bankN} ${plural(f.bankN,'клиент','клиента','клиентов')} · ${money(f.bank)}`,'bank',rows,[['Сумма',c=>nfmt(g(c))],['Закрыта в периоде',c=>cin.has(c.id)?'✓ '+dshow(closedDate(c)).slice(0,5):'—']])
+   +tbl(`Закрытые сделки — ${f.closedN} · ${money(f.closedSum)}`,'closed',f.closedList,[['Сумма',c=>nfmt(g(c))],['Возврат',c=>{const r=calcAt(c);return r.refund?'<span style="color:var(--danger)">−'+nfmt(r.refund)+'</span>':'—'}],['Команде',c=>{const r=calcAt(c);return r.sharesTotal?'−'+nfmt(r.sharesTotal):'—'}],['Расходы',c=>{const r=calcAt(c);return r.expense?'−'+nfmt(r.expense):'—'}],['Vanguard',c=>'<b>'+nfmt(calcAt(c).vanguard)+'</b>']])
+   +(f.waitN?tbl(`Ожидается — ${f.waitN} · ${money(f.waitSum)}`,'wait',f.waitList.slice().sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9')),[['Сумма',c=>nfmt(calcClient(c).cost)]]):'')}
 function clientsBreakdown(s){const td=today();
   const rows=s.list.slice().sort((a,b)=>(accrualDate(a,cfg().accrual)||'').localeCompare(accrualDate(b,cfg().accrual)||''));
   const wait=liveClients().filter(c=>!c.archived&&!isClosed(c)&&(S.an.city==='all'||!S.an.city||c.city===S.an.city)&&!examPassed(c)).sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9'));
@@ -1736,20 +1770,22 @@ function viewAnalytics(){
     :a.mode==='decade'?periodRange(prevPeriod(periodKeyOf(rng.start))):{start:addDays(rng.start,-n),end:addDays(rng.start,-1)};
   const p=a.mode==='custom'&&(!a.from||!a.to)?null:stats(a.city,pr);
   const D=(c,pv)=>p?pctDelta(c,pv):undefined;
+  const f=fin(a.city,rng);const q=a.mode==='custom'&&(!a.from||!a.to)?null:fin(a.city,pr);const E=k=>q?{delta:pctDelta(f[k],q[k])}:{};
   return tb+`<div class="kpis">
-    ${kpi('users','Клиентов',nfmt(s.clients),{delta:D(s.clients,p&&p.clients)})}${kpi('doc','Сумма договоров',money(s.cost),{delta:D(s.cost,p&&p.cost)})}
-    ${kpi('undo','Возвраты',money(s.refund),{delta:D(s.refund,p&&p.refund)})}
-    ${kpi('layers','Общая выручка',money(s.revenue),{delta:D(s.revenue,p&&p.revenue),hero:true})}
-    ${kpi('team','Выплаты команде',money(s.payroll),{delta:D(s.payroll,p&&p.payroll)})}${kpi('stack','Расходы (по клиентам + общие)',money(s.cexp+s.gexp),{delta:D(s.cexp+s.gexp,p&&(p.cexp+p.gexp))})}
-    ${kpi('target','Доля успешных',s.success===null?'—':s.success+'%',{delta:p&&s.success!==null&&p.success!==null?s.success-p.success:p?null:undefined})}
-    ${kpi('trend','Итого Vanguard (чистые)',money(s.vanguard),{delta:D(s.vanguard,p&&p.vanguard),hero:true})}${kpi('coins','После всех расходов',money(s.net),{delta:D(s.net,p&&p.net)})}
-    ${(()=>{const rng=anRange();const inC=c=>S.an.city==='all'||!S.an.city||c.city===S.an.city;
-      const cl=liveClients().filter(c=>isClosed(c)&&inC(c)&&(c.examDate?examPassed(c):true)&&(()=>{const d=closedDate(c);return d&&d>=rng.start&&d<=rng.end})());const R_=cl.map(calcAt);
-      return kpi('wallet','Банк Vanguard',money(R_.reduce((x,r)=>x+r.revenue,0)),{hero:true,sub:'выручка закрытых сделок: '+cl.length+' (оплачено − возвраты + платные пересдачи)'})
-        +kpi('check','Vanguard чистые — закрытые сделки',money(R_.reduce((x,r)=>x+r.vanguard,0)),{hero:true,sub:'банк − доли команды − расходы по клиентам'})})()}
-    ${(()=>{const td=today();const w=liveClients().filter(c=>!c.archived&&!isClosed(c)&&(S.an.city==='all'||!S.an.city||c.city===S.an.city)&&!examPassed(c));return kpi('clock','Ожидается',money(w.reduce((x,c)=>x+calcClient(c).cost,0)),{sub:w.length?'клиентов: '+w.length+' — экзамен ещё впереди или без даты':'всё уже посчитано'})})()}
+    ${kpi('wallet','Банк Vanguard',money(f.bank),{...E('bank'),hero:true,sub:'клиентов: '+f.bankN+' — деньги получены, сделка открыта или закрыта в этом периоде'})}
+    ${kpi('check','Закрытые сделки',money(f.closedSum),{...E('closedSum'),sub:'закрыто в этом периоде: '+f.closedN})}
+    ${kpi('team','Оплата команде',money(f.team),{...E('team'),sub:'только с закрытых сделок'})}
+    ${kpi('undo','Возвраты',money(f.refund),{...E('refund'),sub:'по закрытым сделкам'})}
+    ${kpi('stack','Расходы',money(f.expenses),{...E('expenses'),sub:'по клиентам '+money(f.cexp)+' + общие '+money(f.gexp)})}
+    ${kpi('coins','Чистые Vanguard',money(f.net),{...E('net'),hero:true,sub:'закрытые − команда − возвраты − расходы'})}
+    ${kpi('trend','Потенциальные Vanguard',money(f.potential),{...E('potential'),sub:'если бы не возвраты и расходы'})}
+    ${kpi('layers','Выручка за период',money(f.revenue),{...E('revenue'),sub:'экзамен в этом периоде и уже прошёл: '+f.revN})}
+    ${kpi('clock','Ожидается',money(f.waitSum),{sub:'клиентов: '+f.waitN+' — экзамен ещё впереди или без даты'})}
+    ${kpi('users','Клиентов',nfmt(f.clients),{...E('clients'),sub:'в банке '+f.bankN+' · ожидается '+f.waitN})}
+    ${kpi('target','Доля успешных',f.success===null?'—':f.success+'%',{sub:'довольные среди закрытых в периоде'})}
   </div>
-  <div class="tiny muted" style="margin:-12px 0 16px">Клиент попадает в выручку только когда наступили дата и время экзамена; платная пересдача — когда наступили дата и время пересдачи.${p?` Стрелки — изменение к прошлому периоду (${dshow(pr.start)} – ${dshow(pr.end)})`:''}</div>
+  <div class="tiny muted" style="margin:-12px 0 16px">Экзамен считается прошедшим, когда наступили его дата и время.${q?` Стрелки — изменение к прошлому периоду (${dshow(pr.start)} – ${dshow(pr.end)})`:''}</div>
+  ${finBreakdown(f)}
   <div class="charts">
     <div class="chartbox" style="grid-column:1/-1"><div class="row"><h3 class="grow">Выручка и чистые</h3><div class="tabs"><button data-anser="decade" class="${a.series==='decade'?'on':''}">По 10-дневкам</button><button data-anser="month" class="${a.series==='month'?'on':''}">По месяцам</button></div></div>
       <div class="small muted">Чистые — после долей команды, расходов по клиентам и общих расходов</div><div class="cv"><canvas id="ch-time"></canvas></div></div>
@@ -1758,7 +1794,6 @@ function viewAnalytics(){
     <div class="chartbox"><h3>Экзамены</h3><div class="small muted">Количество клиентов</div><div class="cv"><canvas id="ch-exam"></canvas></div></div>
     <div class="chartbox"><h3>Воронка статусов</h3><div class="small muted">Доля успешных = довольные ÷ все закрытые сделки${s.success===null?'':': <b>'+s.success+'%</b>'}</div><div class="cv"><canvas id="ch-status"></canvas></div></div>
   </div>
-  ${clientsBreakdown(s)}
   ${playersTable()}
   <div class="sectiontitle" style="margin-top:32px">Возвраты и недовольные клиенты</div>
   <div class="kpis">
@@ -1803,14 +1838,14 @@ function drawAnalytics(){
     let buckets=[];
     if(a.series==='decade'){let k=periodKeyOf(rng.end>today()&&rng.start<=today()?today():rng.end)||currentKey();for(let i=0;i<12;i++){buckets.unshift({label:shortPeriod(k),rng:periodRange(k)});k=prevPeriod(k)}}
     else{let [y,m]=(rng.end>today()&&rng.start<=today()?today():rng.end).split('-').map(Number);for(let i=0;i<12;i++){buckets.unshift({label:MONTHS[m-1].slice(0,3)+' '+String(y).slice(2),rng:{start:isoDate(y,m,1),end:isoDate(y,m,new Date(y,m,0).getDate())}});m--;if(m<1){m=12;y--}}}
-    const ts=buckets.map(b=>stats(a.city,b.rng));
+    const ts=buckets.map(b=>fin(a.city,b.rng));
     const el=id=>document.getElementById(id);
     if(el('ch-time'))S.charts.push(new Chart(el('ch-time'),{type:'line',data:{labels:buckets.map(b=>b.label),datasets:[
-      {label:'Общая выручка',data:ts.map(s=>s.revenue),borderColor:cA,backgroundColor:cA,borderWidth:2,pointRadius:4,tension:.25},
+      {label:'Выручка за период',data:ts.map(s=>s.revenue),borderColor:cA,backgroundColor:cA,borderWidth:2,pointRadius:4,tension:.25},
       {label:'Чистые Vanguard',data:ts.map(s=>s.net),borderColor:cB,backgroundColor:cB,borderWidth:2,pointRadius:4,tension:.25}]},options:chartOpts()}));
-    const cityStats=CITIES.map(c=>stats(c.id,rng));
+    const cityStats=CITIES.map(c=>fin(c.id,rng));
     if(el('ch-city'))S.charts.push(new Chart(el('ch-city'),{type:'bar',data:{labels:CITIES.map(c=>c.name),datasets:[
-      {label:'Общая выручка',data:cityStats.map(s=>s.revenue),backgroundColor:cA,borderRadius:4,maxBarThickness:36},
+      {label:'Выручка за период',data:cityStats.map(s=>s.revenue),backgroundColor:cA,borderRadius:4,maxBarThickness:36},
       {label:'Чистые Vanguard',data:cityStats.map(s=>s.net),backgroundColor:cB,borderRadius:4,maxBarThickness:36}]},options:chartOpts()}));
     const s=stats(a.city,rng);
     const ce={};liveClients().filter(c=>isClosed(c)&&(S.an.city==='all'||!S.an.city||c.city===S.an.city)).forEach(c=>{const d=closedDate(c);if(!d||d<rng.start||d>rng.end)return;Object.entries(calcClient(c).byEmp).forEach(([id,v])=>{if(v>0)ce[id]=(ce[id]||0)+v})});
