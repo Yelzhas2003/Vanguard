@@ -397,6 +397,18 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
 .kpop{display:none;position:absolute;right:-6px;top:24px;z-index:30;width:240px;padding:10px 12px;border-radius:10px;background:var(--card);border:1px solid var(--line2);box-shadow:0 10px 30px rgba(0,0,0,.18);color:var(--text2);font:400 12.5px/1.45 Inter,system-ui,sans-serif;font-style:normal;text-align:left;cursor:default}
 .kinfo:hover .kpop,.kinfo:focus .kpop{display:block}
 :root[data-theme="dark"] .kpop{background:#14161B;border-color:rgba(255,255,255,.25);box-shadow:0 0 18px rgba(255,255,255,.08)}
+
+.todaybar{position:relative;overflow:hidden;border-radius:16px;margin-bottom:16px;padding:22px 26px;color:#fff;display:flex;gap:24px;align-items:center;flex-wrap:wrap;background:linear-gradient(120deg,#0F1B30 0%,#1C3354 55%,#2B4A70 100%);box-shadow:0 10px 30px rgba(15,27,48,.18)}
+.todaybar:before{content:"";position:absolute;inset:0;background:url(assets/bg.jpg) center/cover;opacity:.14;mix-blend-mode:luminosity;pointer-events:none}
+.todaybar:after{content:"";position:absolute;right:-60px;top:-90px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle,rgba(91,141,239,.45),transparent 70%);pointer-events:none}
+.todaybar>*{position:relative;z-index:1}
+.tb-main{flex:1 1 280px}.tb-lbl{font-size:12.5px;opacity:.75;text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+.tb-big{font-size:40px;font-weight:800;letter-spacing:-.02em;margin-top:4px;line-height:1.1}.tb-sub{font-size:13px;opacity:.75;margin-top:6px}
+.tb-cells{display:flex;gap:10px;flex-wrap:wrap}.tb-cell{min-width:140px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:12px 14px;backdrop-filter:blur(6px)}
+.tb-cell.hl{background:rgba(91,141,239,.28);border-color:rgba(160,195,255,.5)}.tb-k{font-size:12px;opacity:.75}.tb-v{font-size:20px;font-weight:750;margin-top:2px}
+:root[data-theme="dark"] .todaybar{background:linear-gradient(120deg,#07080A,#11141A 60%,#1A1F28);box-shadow:0 0 0 1px rgba(255,255,255,.35),0 0 26px rgba(255,255,255,.12)}
+:root[data-theme="dark"] .tb-cell.hl{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.5);box-shadow:0 0 14px rgba(255,255,255,.18)}
+@media (max-width:640px){.tb-big{font-size:30px}.todaybar{padding:18px}}
 </style>
 </head>
 <body>
@@ -404,7 +416,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 07:20</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 07:50</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -755,12 +767,15 @@ const ROUTES=[
   {id:'all',name:'Все города',ic:'globe'},
   {grp:'Работа'},
   {id:'schedule',name:'Расписание',ic:'cal'},
+  {id:'upcoming',name:'Ближайшие записи',ic:'clock'},
   {id:'payouts',name:'Выплаты по 10 дням',ic:'wallet'},
   {id:'staff',name:'Игроки',ic:'users',own:1},
   {grp:'Продажи'},
   {id:'leads',name:'Лиды',ic:'funnel'},{id:'sales',name:'Аналитика продаж',ic:'trend',own:1},
   {grp:'Финансы',own:1},
-  {id:'analytics',name:'Аналитика',ic:'chart',own:1},{id:'expenses',name:'Расходы',ic:'receipt',own:1},{id:'journal',name:'Журнал изменений',ic:'clock',own:1},{id:'settings',name:'Настройки',ic:'gear',own:1}];
+  {id:'analytics',name:'Аналитика',ic:'chart',own:1},{id:'expenses',name:'Расходы',ic:'receipt',own:1},
+  {grp:'Система',own:1},
+  {id:'journal',name:'Журнал изменений',ic:'doc',own:1},{id:'settings',name:'Настройки',ic:'gear',own:1}];
 function routeOk(id){const r=ROUTES.find(x=>x.id===id);return r&&r.id&&(!r.own||isOwner())&&(!r.me||!!myEmp())}
 function homeRoute(){return !isOwner()&&myEmp()?'me':'astana'}
 function readHash(){const h=location.hash.replace('#','');S.route=routeOk(h)?h:(S.route&&S.route!=='astana'&&routeOk(S.route)?S.route:homeRoute())}
@@ -806,6 +821,7 @@ function render(){
   else if(r==='settings')html=viewSettings();
   else if(r==='leads')html=viewLeads();
   else if(r==='journal')html=viewJournal();
+  else if(r==='upcoming')html=viewUpcoming();
   else if(r==='sales')html=viewSales();
   if(!S.canWrite)html='<div class="note">Режим просмотра: у вашего доступа нет прав на изменение данных.</div>'+html;
   if(ownerSetupMode()&&(r==='staff'||r==='settings'))html='<div class="note"><b>Первая настройка.</b> Пока ни один тренер не привязан, любой вошедший видит всё. Добавьте себя в «Игроки» с галочкой «Тренер» и своим логином <b>'+esc(emailToLogin(S.email))+'</b> — после этого остальные будут видеть только своё.</div>'+html;
@@ -819,6 +835,7 @@ function render(){
     const rm=$('[data-act="rmPhoto"]',v);if(rm&&me)rm.onclick=async e=>{e.preventDefault();try{await updDoc(BASE+'/employees/'+me.id,{photo:'',updatedAt:nowIso()});toast('Фото убрано')}catch(x){}}}
   if(r==='leads')bindLeads(v);
   if(r==='journal')bindJournal(v);
+  if(r==='upcoming')bindUpcoming(v);
   if(r==='sales'){bindSales(v);drawSales()}
 }
 
@@ -1786,7 +1803,7 @@ function viewAnalytics(){
   const p=a.mode==='custom'&&(!a.from||!a.to)?null:stats(a.city,pr);
   const D=(c,pv)=>p?pctDelta(c,pv):undefined;
   const f=fin(a.city,rng);const q=a.mode==='custom'&&(!a.from||!a.to)?null:fin(a.city,pr);const E=k=>q?{delta:pctDelta(f[k],q[k])}:{};
-  return tb+`<div class="kpis">
+  return tb+todayFin(a.city)+`<div class="kpis">
     ${kpi('stack','Оборот за период',money(f.turnover),{...E('turnover'),sub:'все деньги клиентов в банке, без вычета возвратов (без «Ожидается»)'})}
     ${kpi('wallet','Банк Vanguard',money(f.bank),{...E('bank'),hero:true,sub:'клиентов: '+f.bankN+' — деньги получены (за вычетом возвратов), сделка открыта или закрыта в этом периоде'})}
     ${kpi('check','Закрытые сделки',money(f.closedSum),{...E('closedSum'),sub:'закрыто в этом периоде: '+f.closedN+' · уже за вычетом возвратов'})}
@@ -2057,7 +2074,7 @@ function viewSales(){
     ${a.mode==='month'?`<input type="month" class="input" id="sl-month" value="${a.month||today().slice(0,7)}" style="width:auto">`:''}
     <div class="grow"></div><a class="btn sm" href="#leads">${icon('users')} Лиды</a></div>`;
   const rows=Object.entries(s.bySeller).sort((x,y)=>y[1].sum-x[1].sum);
-  return tb+`<div class="kpis">
+  return tb+todaySales(a.city)+`<div class="kpis">
     ${kpi('users','Лидов',nfmt(s.leads),{...D('leads'),sub:'в работе '+s.open})}
     ${kpi('check','Получено броней',nfmt(s.booked),{...D('booked'),sub:'из лидов периода'})}
     ${kpi('target','Конверсия',s.conv===null?'—':s.conv+'%',{hero:true,sub:'лид → бронь'})}
@@ -2113,6 +2130,42 @@ function bindLeads(v){
     board.ondrop=e=>{const col=e.target.closest('.col');if(!col||!dragId)return;e.preventDefault();const id=dragId;dragId=null;setLeadStatus(id,col.dataset.lcol)};
   }
 }
+
+
+/* ===== СЕГОДНЯ: баннеры ===== */
+function todayBar(title,big,sub,cells){return `<div class="todaybar"><div class="tb-main"><div class="tb-lbl">${title}</div><div class="tb-big">${big}</div><div class="tb-sub">${sub}</div></div>
+  <div class="tb-cells">${cells.map(([k,v,h])=>`<div class="tb-cell ${h?'hl':''}"><div class="tb-k">${k}</div><div class="tb-v">${v}</div></div>`).join('')}</div></div>`}
+function todayFin(city){const td=today();const inC=c=>city==='all'||!city||c.city===city;
+  const ex=liveClients().filter(c=>!c.archived&&inC(c)&&c.examDate===td);
+  const rt=liveClients().filter(c=>!c.archived&&inC(c)&&c.retake&&c.retake.kind==='paid'&&c.retake.date===td&&num(c.retake.fee));
+  let rev=0,van=0;ex.forEach(c=>{const r=calcClient({...c,retake:null,refund:0});rev+=r.paid;van+=r.vanguard});
+  rt.forEach(c=>{const fee=Math.round(num(c.retake.fee));rev+=fee;van+=('tPct' in c.retake)?rtAmounts(c.retake,fee).v:fee});
+  const done=ex.filter(examPassed).length;const nm=WD[(new Date(td+'T00:00:00').getDay()+6)%7];
+  return todayBar('Выручка за сегодня · '+nm+', '+dshow(td),money(rev),ex.length||rt.length?`экзаменов: ${ex.length}${rt.length?' · платных пересдач: '+rt.length:''} · уже прошло: ${done}`:'сегодня экзаменов нет',
+    [['Чистыми Vanguard',money(van),true],['Команде',money(rev-van)],['Экзаменов',nfmt(ex.length+rt.length)]])}
+function todaySales(city){const td=today();const inC=c=>city==='all'||!city||c.city===city;
+  const b=liveClients().filter(c=>inC(c)&&c.payDate===td);
+  const sum=b.reduce((a,c)=>a+calcClient(c).cost,0);const ld=liveLeads().filter(l=>inC(l)&&leadDate(l)===td);
+  const nm=WD[(new Date(td+'T00:00:00').getDay()+6)%7];
+  return todayBar('Продажи за сегодня · '+nm+', '+dshow(td),money(sum),b.length?`броней: ${b.length} · средний чек ${money(Math.round(sum/b.length))}`:'сегодня броней пока нет',
+    [['Броней',nfmt(b.length),true],['Новых лидов',nfmt(ld.length)],['Отказов',nfmt(ld.filter(l=>l.status==='lost').length)]])}
+
+/* ===== БЛИЖАЙШИЕ ЗАПИСИ ===== */
+function viewUpcoming(){if(!S.up)S.up={city:'',days:14};const U=S.up;const td=today();const to=addDays(td,U.days-1);
+  const items=buildItems(td,to,{free:false,ev:()=>true,cl:()=>true}).filter(it=>!it.free&&(it.kind==='session'||it.kind==='exam'||(it.kind==='slot'&&it.title))&&(!U.city||it.city===U.city))
+    .filter(it=>!(it.date===td&&it.start&&it.start<nowHM()&&toMin(it.start)+300<toMin(nowHM())))
+    .sort((a,b)=>(a.date+(a.start||'99')).localeCompare(b.date+(b.start||'99')));
+  const cid=it=>it.kind==='exam'?it.id:(S.sched[it.id]&&S.sched[it.id].clientId)||'';
+  const byDay={};items.forEach(it=>(byDay[it.date]=byDay[it.date]||[]).push(it));
+  const dl=d=>{const w=WD[(new Date(d+'T00:00:00').getDay()+6)%7];return (d===td?'Сегодня':d===addDays(td,1)?'Завтра':w)+', '+dshow(d)};
+  const tb=`<div class="toolbar"><div class="tabs">${[['','Все города'],...CITIES.map(c=>[c.id,c.name])].map(([k,n])=>`<button data-upcity="${k}" class="${U.city===k?'on':''}">${n}</button>`).join('')}</div>
+    <div class="tabs">${[[7,'7 дней'],[14,'14 дней'],[30,'30 дней']].map(([k,n])=>`<button data-updays="${k}" class="${U.days===k?'on':''}">${n}</button>`).join('')}</div><div class="grow"></div><span class="small muted">Записей: ${items.length}</span></div>`;
+  if(!items.length)return tb+'<div class="card empty"><b>Ближайших записей нет</b>Здесь появятся экзамены и пересдачи всех городов с датой и временем.</div>';
+  return tb+Object.keys(byDay).map(d=>`<div class="sectiontitle" style="margin-top:18px">${dl(d)} <span class="muted small" style="font-weight:400">· ${byDay[d].length}</span></div>
+    <div class="tablewrap"><table class="t" style="table-layout:fixed;min-width:860px"><colgroup><col style="width:80px"><col style="width:160px"><col style="width:20%"><col style="width:100px"><col style="width:18%"><col style="width:100px"><col></colgroup><thead><tr><th>Время</th><th>Что</th><th>Клиент</th><th>Город</th><th>Связка</th><th>На месте</th><th>Адрес</th></tr></thead><tbody>
+    ${byDay[d].map(it=>{const c=S.clients[cid(it)];const passed=happened(it.date,it.start);return `<tr ${c?`data-cid="${c.id}" style="cursor:pointer;${passed?'opacity:.55':''}"`:''}><td><b>${it.start||'—'}</b></td><td><span class="badge" style="border-color:${it.color};color:${it.color}">${esc(it.type)}</span></td><td><b>${esc(it.title||'')}</b></td><td>${esc(CITY_NAME[it.city]||(c&&CITY_NAME[c.city])||'')}</td><td>${esc(it.who||(c?pairName({teacherId:c.teacherId,techId:c.techId}):''))}</td><td>${it.arrive?'<b style="color:var(--prio)">'+it.arrive+'</b>':'—'}</td><td class="small">${esc(c&&c.address||'')}</td></tr>`}).join('')}
+    </tbody></table></div>`).join('')}
+function bindUpcoming(v){$$('[data-upcity]',v).forEach(b=>b.onclick=()=>{S.up.city=b.dataset.upcity;render()});$$('[data-updays]',v).forEach(b=>b.onclick=()=>{S.up.days=Number(b.dataset.updays);render()})}
 
 /* ===== ЖУРНАЛ ИЗМЕНЕНИЙ ===== */
 const LOG_MAX=500;
