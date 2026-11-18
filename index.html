@@ -393,7 +393,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 03:50</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 18.11 · 04:05</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1739,6 +1739,11 @@ function viewAnalytics(){
     ${kpi('team','Выплаты команде',money(s.payroll),{delta:D(s.payroll,p&&p.payroll)})}${kpi('stack','Расходы (по клиентам + общие)',money(s.cexp+s.gexp),{delta:D(s.cexp+s.gexp,p&&(p.cexp+p.gexp))})}
     ${kpi('target','Доля успешных',s.success===null?'—':s.success+'%',{delta:p&&s.success!==null&&p.success!==null?s.success-p.success:p?null:undefined})}
     ${kpi('trend','Итого Vanguard (чистые)',money(s.vanguard),{delta:D(s.vanguard,p&&p.vanguard),hero:true})}${kpi('coins','После всех расходов',money(s.net),{delta:D(s.net,p&&p.net)})}
+    ${(()=>{const rng=anRange();const inC=c=>S.an.city==='all'||!S.an.city||c.city===S.an.city;
+      const cl=liveClients().filter(c=>isClosed(c)&&inC(c)&&(()=>{const d=closedDate(c);return d&&d>=rng.start&&d<=rng.end})());
+      const op=liveClients().filter(c=>!c.archived&&!isClosed(c)&&inC(c));
+      return kpi('check','Vanguard — закрытые сделки',money(cl.reduce((x,c)=>x+calcClient(c).vanguard,0)),{hero:true,sub:'сделок закрыто: '+cl.length+' (по дате закрытия)'})
+        +kpi('trend','Vanguard — потенциально',money(op.reduce((x,c)=>x+calcClient({...c,paidPct:100,refund:0}).vanguard,0)),{sub:'сделок в работе: '+op.length+' — если закроются без возврата'})})()}
     ${(()=>{const td=today();const w=liveClients().filter(c=>!c.archived&&!isClosed(c)&&(S.an.city==='all'||!S.an.city||c.city===S.an.city)&&(!c.examDate||c.examDate>td));return kpi('clock','Ожидается',money(w.reduce((x,c)=>x+calcClient(c).cost,0)),{sub:w.length?'клиентов: '+w.length+' — экзамен ещё впереди или без даты':'всё уже посчитано'})})()}
   </div>
   <div class="tiny muted" style="margin:-12px 0 16px">Клиент считается в выручку только когда наступил день экзамена.${p?` Стрелки — изменение к прошлому периоду (${dshow(pr.start)} – ${dshow(pr.end)})`:''}</div>
