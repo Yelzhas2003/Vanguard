@@ -102,6 +102,28 @@ svg.i{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-widt
 .colh .cnt{margin-left:auto;color:var(--muted);font-weight:600;font-size:12.5px;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:0 7px}
 .colsum{font-size:12.5px;color:var(--muted);padding:0 4px 10px;margin-top:-6px}
 .btn.risky:not(.pri){border-color:var(--warn);color:var(--warn)}
+.fxban{position:fixed;left:50%;top:18px;transform:translate(-50%,-140%);z-index:10000;pointer-events:none;min-width:280px;max-width:92vw;text-align:center;padding:14px 26px;border-radius:16px;color:#fff;transition:transform .55s cubic-bezier(.2,1.3,.4,1),opacity .5s;opacity:0}
+.fxban.in{transform:translate(-50%,0);opacity:1}
+.fxban.bron{background:linear-gradient(135deg,#1e3a8a,#7c3aed);box-shadow:0 10px 40px rgba(124,58,237,.45)}
+.fxban.calm{background:linear-gradient(135deg,#0c4a6e,#0e7490);box-shadow:0 10px 40px rgba(14,116,144,.45)}
+.fxban .fx-t{font-size:19px;font-weight:800}.fxban .fx-s{font-size:13px;opacity:.85;margin-top:3px}
+.fxrocket{position:fixed;left:0;top:0;z-index:9999;pointer-events:none;font-size:46px;filter:drop-shadow(0 0 12px rgba(251,146,60,.8))}
+.fxrocket span{display:inline-block;transform:rotate(45deg)}
+.fxwave{position:fixed;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;z-index:9998;pointer-events:none;background:radial-gradient(circle,rgba(56,189,248,.35),rgba(56,189,248,0) 70%);animation:fxWave 2.4s ease-out forwards}
+@keyframes fxWave{from{transform:scale(1);opacity:1}to{transform:scale(60);opacity:0}}
+.fxwork{position:fixed;inset:0;z-index:9990;display:grid;place-items:center;background:rgba(2,6,23,0);transition:background .35s}
+.fxwork.in{background:rgba(2,6,23,.55)}
+.fxw-card{position:relative;background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:22px;padding:26px 30px 24px;width:min(360px,90vw);text-align:center;transform:scale(.85);opacity:0;transition:transform .4s cubic-bezier(.2,1.3,.4,1),opacity .3s;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.fxwork.in .fxw-card{transform:scale(1);opacity:1}
+.fxw-x{position:absolute;right:10px;top:10px}
+.fxw-lbl{font-size:13px;text-transform:uppercase;letter-spacing:.08em;opacity:.7;font-weight:700}
+.fxw-ring{position:relative;width:180px;height:180px;margin:14px auto 10px}
+.fxw-ring svg circle[data-len]{filter:drop-shadow(0 0 6px rgba(96,165,250,.45))}
+.fxw-num{position:absolute;inset:0;display:grid;place-items:center;font-size:54px;font-weight:800}
+.fxw-leg{display:flex;flex-wrap:wrap;gap:6px 12px;justify-content:center;font-size:13px}
+.fxw-leg i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle}
+.fxw-ph{margin-top:16px;font-size:17px;font-weight:700;opacity:0;transform:translateY(8px);transition:opacity .5s,transform .5s}
+.fxw-ph.in{opacity:1;transform:none}
 .congrats{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%) scale(.8);z-index:10000;pointer-events:none;text-align:center;padding:22px 34px;border-radius:18px;background:rgba(15,23,42,.88);color:#fff;box-shadow:0 0 40px rgba(250,204,21,.45);animation:cgIn .45s cubic-bezier(.2,1.4,.4,1) forwards;transition:opacity .6s,transform .6s}
 .congrats .cg-big{font-size:34px;font-weight:800;background:linear-gradient(90deg,#facc15,#f43f5e,#a855f7,#22d3ee);-webkit-background-clip:text;background-clip:text;color:transparent}
 .congrats .cg-sub{margin-top:6px;font-size:15px;opacity:.9}
@@ -428,7 +450,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 20.11 · 02:18</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 20.11 · 02:36</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1486,6 +1508,8 @@ async function saveClient(){
     toast(isNew?'Клиент добавлен':'Сохранено');
     const good=x=>x&&x.status==='closed'&&x.closed&&x.closed.outcome==='good';
     if(good(data)&&!good(old))celebrate(data.name);
+    else if(data.status==='bron'&&(!old||old.status!=='bron'))cheerBron(data.name);
+    else if(data.status==='decide'&&(!old||old.status!=='decide'))calmDecide(data.name);
   }catch(e){}
 }
 async function syncSlot(oldId,newId_,cid,kind){
@@ -1498,6 +1522,7 @@ async function setClientStatus(id,status){
   if(status==='offered'||status==='retake'||status==='closed'||(status==='decide'&&!S.clients[id].decideReason)||(status==='process'&&!c.examDate)||(status==='bron'&&!(c.level&&c.target&&c.deadline))){openClient(id,false,status);return}
   const hist=[...(c.history||[]),{at:nowIso(),by:S.uid||'',action:'статус → '+statusById(status).name}].slice(-60);
   const wasClosed=isClosed(c)&&status!=='closed';
+  if(status==='bron')setTimeout(()=>cheerBron(c.name),150);else if(status==='decide')setTimeout(()=>calmDecide(c.name),150);
   try{await updDoc(BASE+'/clients/'+id,{status,updatedAt:nowIso(),updatedBy:S.uid||'',history:hist,...(wasClosed?{closed:null,refund:0,refundPct:'',refundMode:'sum',refundComment:''}:{})});if(wasClosed)toast('Итог сделки (доволен / недоволен, возврат) убран')}catch(e){}
 }
 async function archiveClient(id,val){
@@ -2270,6 +2295,54 @@ function startWeb(box){
   TW.raf=requestAnimationFrame(frame);
 }
 
+/* ===== Анимации-похвалы ===== */
+function noMotion(){try{return matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){return false}}
+const BRON_PHRASES=['Есть бронь! Так держать 🔥','Ещё один клиент с нами. Отличная работа!','Красиво сработано! 🚀','Минус один свободный клиент на рынке 😎'];
+const DECIDE_PHRASES=['Спокойно. Решим чётко и без нервов 🧊','Не переживай, всё будет безупречно'];
+const pickOne=a=>a[Math.floor(Math.random()*a.length)];
+function fxBanner(cls,html,ms){const d=document.createElement('div');d.className='fxban '+cls;d.innerHTML=html;document.body.appendChild(d);
+  requestAnimationFrame(()=>d.classList.add('in'));setTimeout(()=>d.classList.remove('in'),ms);setTimeout(()=>d.remove(),ms+700);return d}
+function cheerBron(name){
+  fxBanner('bron',`<div class="fx-t">${esc(pickOne(BRON_PHRASES))}</div><div class="fx-s">${esc(name||'')} — в брони</div>`,3000);
+  if(noMotion())return;
+  const r=document.createElement('div');r.className='fxrocket';r.innerHTML='<span>🚀</span>';document.body.appendChild(r);
+  const tr=document.createElement('canvas');tr.style.cssText='position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;z-index:9998';document.body.appendChild(tr);
+  const dpr=Math.min(2,devicePixelRatio||1),W=innerWidth,H=innerHeight;tr.width=W*dpr;tr.height=H*dpr;const g=tr.getContext('2d');g.scale(dpr,dpr);
+  const P=[];const t0=performance.now(),D=1700;
+  (function f(t){const k=Math.min(1,(t-t0)/D);const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    const x=-60+(W+120)*e,y=H*.78-H*.55*e+Math.sin(e*Math.PI)*-40;r.style.transform=`translate(${x}px,${y}px) rotate(${-8+e*-4}deg)`;
+    if(k<1)for(let i=0;i<3;i++)P.push({x:x+6,y:y+30,vx:-1-Math.random()*2,vy:1+Math.random()*1.5,l:1,c:['#facc15','#fb923c','#f43f5e','#fde68a'][i%4]});
+    g.clearRect(0,0,W,H);P.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.l-=.022;if(p.l>0){g.globalAlpha=p.l;g.fillStyle=p.c;g.beginPath();g.arc(p.x,p.y,2+3*p.l,0,7);g.fill()}});g.globalAlpha=1;
+    if(k<1||P.some(p=>p.l>0))requestAnimationFrame(f);else{tr.remove();r.remove()}})(t0);
+}
+function calmDecide(name){
+  if(!noMotion()){const w=document.createElement('div');w.className='fxwave';document.body.appendChild(w);setTimeout(()=>w.remove(),2600)}
+  fxBanner('calm',`<div class="fx-t">${esc(pickOne(DECIDE_PHRASES))}</div><div class="fx-s">${esc(name||'')} — нужно решить</div>`,3200);
+}
+function myWorkClients(){const me=myEmp();if(!me)return [];
+  const mine=c=>c.teacherId===me.id||c.techId===me.id||c.ieltsOrgId===me.id||c.soldBy===me.id||((c.rates&&c.rates.extras)||[]).some(x=>x.empId===me.id);
+  return liveClients().filter(c=>!c.archived&&mine(c)&&statusById(c.status).id!=='closed')}
+function showMyWork(){
+  const L=myWorkClients();const n=L.length;const sts=cfg().statuses.filter(x=>x.id!=='closed');
+  const parts=sts.map(x=>({...x,n:L.filter(c=>statusById(c.status).id===x.id).length})).filter(x=>x.n);
+  const phrase=n?'Не переживай, бро — всё будет хорошо 🤝':'Пока тихо. Самое время найти новых 🎯';
+  const R=70,C=2*Math.PI*R;let off=0;
+  const arcs=parts.map(p=>{const len=C*p.n/n;const a=`<circle cx="90" cy="90" r="${R}" fill="none" stroke="${p.color}" stroke-width="14" stroke-dasharray="0 ${C}" data-len="${len-3}" data-off="${-off}" stroke-dashoffset="${-off}" stroke-linecap="round" transform="rotate(-90 90 90)"/>`;off+=len;return a}).join('');
+  const ov=document.createElement('div');ov.className='fxwork';
+  ov.innerHTML=`<div class="fxw-card"><button class="iconbtn fxw-x" aria-label="Закрыть">✕</button><div class="fxw-lbl">Клиентов в работе</div>
+    <div class="fxw-ring"><svg viewBox="0 0 180 180" width="180" height="180"><circle cx="90" cy="90" r="${R}" fill="none" stroke="rgba(148,163,184,.18)" stroke-width="14"/>${arcs}</svg><div class="fxw-num">0</div></div>
+    <div class="fxw-leg">${parts.map(p=>`<span><i style="background:${p.color}"></i>${esc(p.name)}: <b>${p.n}</b></span>`).join('')}</div>
+    <div class="fxw-ph">${esc(phrase)}</div></div>`;
+  document.body.appendChild(ov);const close=()=>{ov.classList.remove('in');setTimeout(()=>ov.remove(),350)};
+  ov.onclick=e=>{if(e.target===ov||e.target.closest('.fxw-x'))close()};
+  requestAnimationFrame(()=>ov.classList.add('in'));
+  const num=ov.querySelector('.fxw-num'),t0=performance.now(),D=noMotion()?1:1100;
+  const circ=[...ov.querySelectorAll('circle[data-len]')];
+  (function f(t){const k=Math.min(1,(t-t0)/D),e=1-Math.pow(1-k,3);num.textContent=Math.round(n*e);
+    circ.forEach(c=>c.setAttribute('stroke-dasharray',(Math.max(0,+c.dataset.len)*e)+' '+C));
+    if(k<1)requestAnimationFrame(f);else setTimeout(()=>ov.querySelector('.fxw-ph').classList.add('in'),100)})(t0);
+}
+
 /* ===== Конфетти при «Доволен» ===== */
 function celebrate(name){
   try{if(matchMedia('(prefers-reduced-motion: reduce)').matches){toast('🎉 Congratulations! Сделка закрыта');return}}catch(e){}
@@ -2601,7 +2674,7 @@ function viewMe(){
           :`<div class="mb-lbl">${icon('cal')} Ближайшее</div><div class="mb-ev">Записей пока нет</div><div class="mb-evs">Добавьте свободное время — вас предложат в связку</div>`}</div>
       <div class="mb-right"><div class="mb-lbl">${icon('wallet')} К выплате</div><div class="mb-big">${money(due)}</div>
         <div class="mb-evs">${pastDue>0?'ждёт выплаты '+money(pastDue)+' · ':''}за текущий период ${money(curDue)} — выплата ${dshow(curEnd).slice(0,5)}</div>
-        <div class="mb-btns"><button class="btn sm" data-act="myFree">+ Слот</button><button class="btn sm" data-act="goSched">Мои записи</button><a class="btn sm" href="#payouts">Мои выплаты</a></div></div>
+        <div class="mb-btns"><button class="btn sm" data-act="myWork">Сколько клиентов в работе?</button><button class="btn sm" data-act="myFree">+ Слот</button><button class="btn sm" data-act="goSched">Мои записи</button><a class="btn sm" href="#payouts">Мои выплаты</a></div></div>
     </div>
     <div class="kpis">${k('Текущий период',money(period),periodLabel(cur))}${k('За этот месяц',money(month),MONTHS[Number(ym.slice(5))-1])}${k('Потенциальный заработок',money(potential),openMine.length?'сделок в работе: '+openMine.length:'нет открытых сделок')}${k('Заработано за всё время',money(earnedAll),'выплачено '+money(paidAll))}${k('Потеряно на возвратах',lost?'<span style="color:var(--danger)">−'+money(lost)+'</span>':money(0),lostCl.length?'возвратов: '+lostCl.length:'возвратов нет')}</div>
     <div class="kpis">${k('Мои клиенты',nfmt(allMine.length),'в работе '+inWork+' · закрыто '+closed.length)}${k('Довольные клиенты',sat===null?'—':sat+'%',good+bad?good+' из '+(good+bad)+' закрытых':'пока нет закрытых')}${k('Записей на 2 недели',nfmt(upcoming.length),'экзамены и пересдачи')}${k('Свободно на неделе',freeH+' ч',freeH?'':'добавьте слоты')}</div>
@@ -3047,6 +3120,7 @@ function bindView(r){
   const v=$('#view');
   v.onclick=async e=>{
     if((r==='schedule'||r==='me')&&schedClick(e))return;
+    if(e.target.closest('[data-act="myWork"]')){showMyWork();return}
     if(e.target.closest('[data-act="myFree"]')){const m=myEmp();openSlots(null,m&&m.id);return}
     const kf=e.target.closest('[data-kflag]');if(kf){e.stopPropagation();const [id,k]=kf.dataset.kflag.split('|');dropFlag(id,k);return}
     const kt=e.target.closest('[data-ktoggle]');if(kt){e.stopPropagation();const id=kt.dataset.ktoggle;S.kopen=S.kopen||{};S.kopen[id]=!S.kopen[id];const card=kt.closest('.kcard');const c=S.clients[id];
