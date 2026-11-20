@@ -416,7 +416,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 20.11 · 01:45</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 20.11 · 01:52</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -437,7 +437,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
 /* ===== Чистая логика расчёта (без интерфейса) ===== */
 const CITIES=[{id:'astana',name:'Астана'},{id:'almaty',name:'Алматы'},{id:'shymkent',name:'Шымкент'}];
 const CITY_NAME={astana:'Астана',almaty:'Алматы',shymkent:'Шымкент',general:'Общий'};
-const ROLES=[{id:'teacher',name:'Учитель'},{id:'tech',name:'Тех специалист'},{id:'sales',name:'Продажник'},{id:'owner',name:'Тренер'}];
+const ROLES=[{id:'ielts',name:'Организатор IELTS'},{id:'teacher',name:'Учитель'},{id:'tech',name:'Тех специалист'},{id:'sales',name:'Продажник'},{id:'owner',name:'Тренер'}];
 const ROLE_NAME={ielts:'Организатор IELTS',teacher:'Учитель',tech:'Тех специалист',sales:'Продажа',extra:'Доплата',owner:'Тренер'};
 const EXAMS=['TOEFL iBT','Duolingo','IELTS','Другое'];
 const ADDONS=[{id:'none',name:'Нет'},{id:'paid',name:'Пересдача платная'},{id:'free',name:'Пересдача бесплатная'}];
@@ -538,6 +538,7 @@ function accrualDate(c,mode){
   return mode==='payment'?(c.payDate||c.examDate||fb):(c.examDate||(isClosed(c)?((c.closed&&c.closed.date)||c.payDate||fb):null));
 }
 /* Начисления: период → игрок → {total, byRole, clients} */
+function roleWord(r){return {teacher:'учитель',tech:'тех',sales:'продажа',extra:'доплата',ielts:'организатор IELTS'}[r]||r}
 function buildLedger(clients,mode){
   const L={};
   clients.forEach(c=>{
@@ -548,10 +549,10 @@ function buildLedger(clients,mode){
     r.shares.forEach(s=>{
       if(!s.empId||!s.amount)return;
       const P=L[key]||(L[key]={});
-      const e=P[s.empId]||(P[s.empId]={total:0,byRole:{teacher:0,tech:0,sales:0,extra:0},clients:{}});
+      const e=P[s.empId]||(P[s.empId]={total:0,byRole:{teacher:0,tech:0,sales:0,extra:0,ielts:0},clients:{}});
       e.total+=s.amount; e.byRole[s.role]=(e.byRole[s.role]||0)+s.amount;
-      const cl=e.clients[c.id]||(e.clients[c.id]={name:c.name||'',amount:0});
-      cl.amount+=s.amount;
+      const cl=e.clients[c.id]||(e.clients[c.id]={name:c.name||'',amount:0,roles:[]});
+      cl.amount+=s.amount;if(!(cl.roles||(cl.roles=[])).includes(s.role))cl.roles.push(s.role);
     });
   });
   return L;
@@ -650,7 +651,7 @@ const S={db:null,user:null,uid:null,ownerAcc:false,canWrite:true,route:'',
   got:{},fresh:{},names:{},mode:'board',
   f:{q:'',exam:'',status:'',emp:'',from:'',to:'',arch:false},
   an:{city:'all',mode:'month',period:'',month:'',from:'',to:'',series:'decade'},
-  pay:{period:'',open:{}},exp:{month:'',city:''},staff:{show:'active'},charts:[],leads:{},ld:{q:'',city:'',seller:''},sl:{city:'all',mode:'month',month:''}};
+  pay:{period:'',open:{}},exp:{month:'',city:''},staff:{show:'active'},charts:[],leads:{},tasks:{},tk:{f:'mine'},ld:{q:'',city:'',seller:''},sl:{city:'all',mode:'month',month:''}};
 
 function withDecide(st){if(st.some(x=>x.id==='decide'))return st;const out=st.slice();const i=out.findIndex(x=>x.id==='process');out.splice(i>=0?i+1:out.length,0,{id:'decide',name:'Нужно решить',color:'#E8743B'});return out}
 function cfg(){const c=S.config||{};return {priority:c.priority||null,retakeSplit:c.retakeSplit||{},statuses:withDecide((c.statusesV>=4&&c.statuses&&c.statuses.length)?c.statuses:DEFAULT_STATUSES),accrual:c.accrual||'exam',rules:c.rules||[],sessionMin:300}}
@@ -666,9 +667,10 @@ function isTrainer(){const m=myEmp();if(m&&(m.roles||[]).includes('owner'))retur
 function isCaptain(){const m=myEmp();return !!(m&&m.access==='captain')}
 function isAnalyst(){const m=myEmp();return !!(m&&m.access==='analyst')}
 function isOwner(){return isTrainer()||isCaptain()}
-function canSeeAnalytics(){return isOwner()||isAnalyst()}
-function ieltsScope(){if(isTrainer())return 'all';const m=myEmp();if(!m)return 'noielts';if(m.access==='analyst')return m.anScope||'all';return m.ielts?'all':'noielts'}
-function canAddIelts(){if(isTrainer())return true;const m=myEmp();return !!(m&&m.ielts)}
+function hasIelts(m){return !!(m&&(m.ielts||hasRole(m,'shymkent','ielts')))}
+function canSeeAnalytics(){return isOwner()||isAnalyst()||hasIelts(myEmp())}
+function ieltsScope(){if(isTrainer())return 'all';const m=myEmp();if(!m)return 'noielts';if(m.access==='analyst')return m.anScope||'all';if(m.access==='captain')return hasIelts(m)?'all':'noielts';return hasIelts(m)?'ielts':'noielts'}
+function canAddIelts(){if(isTrainer())return true;return hasIelts(myEmp())}
 function anOk(x){const sc=ieltsScope();const ie=x.exam==='IELTS';return sc==='all'?true:sc==='ielts'?ie:!ie}
 function ledger(){return buildLedger(liveClients(),cfg().accrual)}
 
@@ -760,7 +762,7 @@ function kpi(ic,label,value,o){o=o||{};
   let d='';if(o.delta!==undefined){const v=o.delta;d=v===null?'<span class="dl dl0">—</span>':v>0?`<span class="dl up">↑ +${v}%</span>`:v<0?`<span class="dl dn">↓ ${v}%</span>`:'<span class="dl dl0">0%</span>'}
   return `<div class="kpi ${o.hero?'hero':''}"><div class="kh">${ic?`<svg class="i" viewBox="0 0 24 24">${KIC[ic]||IC[ic]||''}</svg>`:''}<span>${label}</span>${o.sub?`<span class="kinfo" tabindex="0" aria-label="Подробнее">i<span class="kpop">${o.sub}</span></span>`:''}</div><div class="kv"><div class="v">${value}</div>${d}</div></div>`}
 function empMoney(id,L){L=L||ledger();let earned=0,paid=0,due=0;allPeriodKeys().forEach(k=>{const r=payRow(k,id,L);earned+=r.total;paid+=r.paid;due+=r.due});
-  const inv=c=>c.teacherId===id||c.techId===id||c.soldBy===id||((c.rates&&c.rates.extras)||[]).some(x=>x.empId===id);
+  const inv=c=>c.teacherId===id||c.techId===id||c.ieltsOrgId===id||c.soldBy===id||((c.rates&&c.rates.extras)||[]).some(x=>x.empId===id);
   const mine=liveClients().filter(inv);const open=mine.filter(c=>!isClosed(c));
   const potential=open.reduce((a,c)=>a+(calcClient({...c,paidPct:100,refund:0}).byEmp[id]||0),0);
   const lost=mine.filter(isClosed).reduce((a,c)=>a+Math.max(0,(calcClient({...c,refund:0}).byEmp[id]||0)-(calcClient(c).byEmp[id]||0)),0);
@@ -779,6 +781,7 @@ const ROUTES=[
   {grp:'Работа'},
   {id:'schedule',name:'Расписание',ic:'cal'},
   {id:'upcoming',name:'Ближайшие записи',ic:'clock'},
+  {id:'tasks',name:'Задачи',ic:'check'},
   {id:'payouts',name:'Выплаты по 10 дням',ic:'wallet'},
   {id:'staff',name:'Игроки',ic:'users',tr:1},
   {grp:'Продажи'},
@@ -798,7 +801,7 @@ try{applyMini(localStorage.getItem('vg-mini')==='1')}catch(e){}
 $('#sidetoggle').onclick=()=>applyMini(!document.querySelector('.app').classList.contains('mini'));
 document.addEventListener('click',e=>{if(innerWidth<=860&&$('#side').classList.contains('open')&&!e.target.closest('#side')&&!e.target.closest('#burger'))$('#side').classList.remove('open')});
 function renderNav(){
-  $('#nav').innerHTML=ROUTES.filter(routeVis).filter((r,i,a)=>!r.grp||(a[i+1]&&!a[i+1].grp)).map(r=>r.grp?'<div class="grp">'+r.grp+'</div>':`<a href="#${r.id}" class="${S.route===r.id?'on':''}" title="${r.name}">${icon(r.ic)}<span class="nl">${r.name}</span></a>`).join('');
+  $('#nav').innerHTML=ROUTES.filter(routeVis).filter((r,i,a)=>!r.grp||(a[i+1]&&!a[i+1].grp)).map(r=>r.grp?'<div class="grp">'+r.grp+'</div>':`<a href="#${r.id}" class="${S.route===r.id?'on':''}" title="${r.name}">${icon(r.ic)}<span class="nl">${r.name}${r.id==='tasks'&&myOpenTasks()?' <b style="color:var(--danger)">'+myOpenTasks()+'</b>':''}</span></a>`).join('');
   const m=myEmp();
   $('#who').innerHTML=isOwner()?'<b>'+(isTrainer()?'Тренер':'Капитан')+'</b>'+(m?'<br>'+esc(m.name):''):(m?esc(m.name)+'<br>Игрок':'Игрок<br><span class="tiny">аккаунт не привязан</span>');
 }
@@ -833,6 +836,7 @@ function render(){
   else if(r==='settings')html=viewSettings();
   else if(r==='leads')html=viewLeads();
   else if(r==='journal')html=viewJournal();
+  else if(r==='tasks')html=viewTasks();
   else if(r==='upcoming')html=viewUpcoming();
   else if(r==='sales')html=viewSales();
   if(!S.canWrite)html='<div class="note">Режим просмотра: у вашего доступа нет прав на изменение данных.</div>'+html;
@@ -846,6 +850,7 @@ function render(){
   if(r==='me'){const mp=$('#me-photo',v);const me=myEmp();if(mp&&me)mp.onchange=()=>photoFromFile(mp.files[0],async d=>{try{await updDoc(BASE+'/employees/'+me.id,{photo:d,updatedAt:nowIso()});toast('Фото обновлено')}catch(e){}});
     const rm=$('[data-act="rmPhoto"]',v);if(rm&&me)rm.onclick=async e=>{e.preventDefault();try{await updDoc(BASE+'/employees/'+me.id,{photo:'',updatedAt:nowIso()});toast('Фото убрано')}catch(x){}}}
   if(r==='leads')bindLeads(v);
+  if(r==='tasks')bindTasks(v);
   if(r==='journal')bindJournal(v);
   if(r==='upcoming')bindUpcoming(v);
   if(r==='sales'){bindSales(v);drawSales()}
@@ -1024,10 +1029,17 @@ function sessLive(x){if(!(x&&!x.deleted&&x.type==='session'&&x.clientId&&S.clien
 function holdLabel(iso){if(!iso)return '';const d=new Date(iso);return pad(d.getHours())+':'+pad(d.getMinutes())+(isoOf(d)===today()?' сегодня':isoOf(d)===addDays(today(),1)?' завтра':' '+dshow(isoOf(d)).slice(0,5))}
 function offerExpired(c){return statusById(c.status).id==='offered'&&c.offerExpires&&c.offerExpires<=nowIso()}
 function busyOf(pid,date,excl){
-  return liveSched().filter(x=>x.date===date&&partIds(x).includes(pid)&&(
+  const out=liveSched().filter(x=>x.date===date&&partIds(x).includes(pid)&&(
     (x.type==='session'&&sessLive(x)&&x.clientId!==excl)||(x.type==='slot'&&slotOwner(x)&&slotOwner(x)!==excl)||(x.type!=='slot'&&x.type!=='session')))
     .map(x=>[toMin(x.start),toMin(x.start)+num(x.dur||60)]);
+  const L=cfg().sessionMin;const live=id=>id&&S.sched[id]&&(sessLive(S.sched[id])||(S.sched[id].type==='slot'&&!S.sched[id].deleted&&slotOwner(S.sched[id])));
+  Object.values(S.clients||{}).forEach(c=>{if(c.deleted||c.archived||c.id===excl||(c.teacherId!==pid&&c.techId!==pid))return;
+    if(!isClosed(c)&&c.examDate===date&&c.examTime&&!live(c.sessionId)&&!live(c.slotId))out.push([toMin(c.examTime),toMin(c.examTime)+L]);
+    const r=c.retake;if(r&&r.date===date&&r.time&&!live(r.sessionId)&&!live(r.slotId))out.push([toMin(r.time),toMin(r.time)+L])});
+  return out;
 }
+function freeIntervals(pid,date,ws,we){const L=cfg().sessionMin;let iv=[[ws,we]];
+  busyNear(pid,date,null).forEach(([x])=>{const n=[];iv.forEach(([a,b])=>{const l=[a,Math.min(b,x-L)],r=[Math.max(a,x+L),b];if(l[0]<=l[1])n.push(l);if(r[0]<=r[1])n.push(r)});iv=n});return iv}
 function windowsOf(pid,city,date){return liveSched().filter(x=>x.type==='slot'&&x.playerId===pid&&x.date===date&&!slotOwner(x))}
 const ARRIVE_MIN=90;
 function inWindow(pid,date,a){const prev=addDays(date,-1);
@@ -1483,7 +1495,7 @@ async function deleteClient(id,restore){
 }
 
 /* ===== СОТРУДНИКИ ===== */
-function clientsOfEmp(id){return liveClients().filter(c=>c.teacherId===id||c.techId===id||c.soldBy===id||((c.rates&&c.rates.extras)||[]).some(x=>x.empId===id))}
+function clientsOfEmp(id){return liveClients().filter(c=>c.teacherId===id||c.techId===id||c.ieltsOrgId===id||c.soldBy===id||((c.rates&&c.rates.extras)||[]).some(x=>x.empId===id))}
 function viewStaff(){
   const all=liveEmps();
   const list=all.filter(e=>S.staff.show==='all'||(S.staff.show==='active'?e.active!==false:e.active===false));
@@ -1621,7 +1633,7 @@ function payRow(key,empId,L){
   const fr=S.periods[key]&&S.periods[key].emps?S.periods[key].emps[empId]:null;
   const frozen=!!S.periods[key];
   const total=cur?cur.total:0;
-  const base=frozen?(fr||{total:0,byRole:{teacher:0,tech:0,sales:0,extra:0},clients:{}}):(cur||{total:0,byRole:{teacher:0,tech:0,sales:0,extra:0},clients:{}});
+  const base=frozen?(fr||{total:0,byRole:{teacher:0,tech:0,sales:0,extra:0,ielts:0},clients:{}}):(cur||{total:0,byRole:{teacher:0,tech:0,sales:0,extra:0,ielts:0},clients:{}});
   const corr=frozen?corrections(fr,cur):[];
   const paid=paidSum(key,empId);
   return {empId,total,base,corr,corrSum:corr.reduce((a,x)=>a+x.diff,0),paid,due:total-paid,frozen,cur};
@@ -1649,20 +1661,20 @@ function viewPayouts(){
     <button class="btn pri" data-act="payAll" ${rows.some(r=>r.due>0)&&S.canWrite?'':'disabled'}>Отметить всех как выплачено</button>`:''}</div>`;
   if(!own&&!me)return tb+'<div class="card empty"><b>Аккаунт не привязан к игроку</b>Попросите тренера привязать ваш аккаунт в разделе «Игроки», чтобы видеть свои заработки.</div>';
   if(!rows.length)return tb+'<div class="card empty"><b>В этом периоде начислений нет</b>Начисления появятся, когда сделки будут закрыты в этом периоде.</div>';
-  const R=x=>`<td class="r">${nfmt(x)}</td>`;
+  const R=x=>`<td class="r">${nfmt(x)}</td>`;const hasI=rows.some(r=>r.base.byRole.ielts);const RI=x=>hasI?R(x||0):'';
   const sum=k=>rows.reduce((a,r)=>a+(typeof k==='function'?k(r):r[k]),0);
   const body=rows.map(r=>{const e=emp(r.empId);const open=S.pay.open[r.empId];
     const pays=paymentsOf(key,r.empId);
-    return `<tr class="click" data-pay-open="${r.empId}"><td><b>${esc(e?e.name:'')}</b> <span class="muted small">${open?'▾':'▸'}</span></td>${R(r.base.byRole.teacher)}${R(r.base.byRole.tech)}${R(r.base.byRole.sales)}${R(r.base.byRole.extra)}
+    return `<tr class="click" data-pay-open="${r.empId}"><td><b>${esc(e?e.name:'')}</b> <span class="muted small">${open?'▾':'▸'}</span></td>${R(r.base.byRole.teacher)}${R(r.base.byRole.tech)}${R(r.base.byRole.sales)}${RI(r.base.byRole.ielts)}${R(r.base.byRole.extra)}
       <td class="r">${r.corrSum?(r.corrSum>0?'+':'')+nfmt(r.corrSum):'—'}</td><td class="r"><b>${nfmt(r.total)}</b></td>${R(r.paid)}<td class="r"><b style="color:${r.due>0?'var(--accent)':r.due<0?'var(--danger)':'inherit'}">${r.due<0?'переплата '+nfmt(-r.due):nfmt(r.due)}</b></td>
       <td>${own?(r.due>0?`<button class="btn sm pri" data-pay="${r.empId}" ${S.canWrite?'':'disabled'}>Выплачено</button>`:(pays.length?'<span class="chip acc">✓ '+dshow(pays[pays.length-1].date)+'</span>':'')):(pays.length?'<span class="chip acc">✓ '+dshow(pays[pays.length-1].date)+'</span>':'')}</td></tr>
-      ${open?`<tr class="sub"><td colspan="10" style="white-space:normal">
-        <div><b>Клиенты${r.frozen?' (на момент закрытия периода)':''}:</b> ${Object.entries(r.base.clients).map(([cid,x])=>esc(x.name)+' — '+money(x.amount)).join('; ')||'—'}</div>
+      ${open?`<tr class="sub"><td colspan="${hasI?11:10}" style="white-space:normal">
+        <div><b>Клиенты${r.frozen?' (на момент закрытия периода)':''}:</b> ${Object.entries(r.base.clients).map(([cid,x])=>esc(x.name)+(x.roles&&x.roles.length?' <span class="muted">('+x.roles.map(roleWord).join(', ')+')</span>':'')+' — '+money(x.amount)).join('; ')||'—'}</div>
         ${r.corr.length?`<div style="margin-top:6px"><b>Корректировки после закрытия:</b> ${r.corr.map(x=>esc(x.name)+(x.removed?' (удалён/перенесён)':' (изменён)')+' '+(x.diff>0?'+':'−')+money(Math.abs(x.diff))).join('; ')}</div>`:''}
         ${pays.length?`<div style="margin-top:6px"><b>Выплаты:</b> ${pays.map((p,i)=>dshow(p.date)+' — '+money(p.amount)+(own?` <a href="#" data-unpay="${r.empId}" data-i="${i}">отменить</a>`:'')).join('; ')}</div>`:''}
       </td></tr>`:''}`}).join('');
-  return tb+`<div class="tablewrap"><table class="t"><thead><tr><th>Игрок</th><th class="r">Как учитель</th><th class="r">Как тех</th><th class="r">За продажи</th><th class="r">Доплаты</th><th class="r">Корректировки</th><th class="r">Итого</th><th class="r">Выплачено</th><th class="r">К выплате</th><th></th></tr></thead>
-  <tbody>${body}</tbody><tfoot><tr><td>Итого</td>${R(sum(r=>r.base.byRole.teacher))}${R(sum(r=>r.base.byRole.tech))}${R(sum(r=>r.base.byRole.sales))}${R(sum(r=>r.base.byRole.extra))}${R(sum('corrSum'))}${R(sum('total'))}${R(sum('paid'))}${R(sum('due'))}<td></td></tr></tfoot></table></div>
+  return tb+`<div class="tablewrap"><table class="t"><thead><tr><th>Игрок</th><th class="r">Как учитель</th><th class="r">Как тех</th><th class="r">За продажи</th>${hasI?'<th class="r">Организатор IELTS</th>':''}<th class="r">Доплаты</th><th class="r">Корректировки</th><th class="r">Итого</th><th class="r">Выплачено</th><th class="r">К выплате</th><th></th></tr></thead>
+  <tbody>${body}</tbody><tfoot><tr><td>Итого</td>${R(sum(r=>r.base.byRole.teacher))}${R(sum(r=>r.base.byRole.tech))}${R(sum(r=>r.base.byRole.sales))}${RI(sum(r=>r.base.byRole.ielts||0))}${R(sum(r=>r.base.byRole.extra))}${R(sum('corrSum'))}${R(sum('total'))}${R(sum('paid'))}${R(sum('due'))}<td></td></tr></tfoot></table></div>
   <p class="small muted">Игрокам начисляется только по закрытым сделкам — в период даты закрытия (с учётом возвратов). Нажмите на строку, чтобы увидеть клиентов и корректировки. Если клиента изменили после закрытия периода, разница показывается в «Корректировках», а уже выплаченные суммы не меняются — остаток или переплата видны в «К выплате».</p>`;
 }
 function payDialog(empIds,key){
@@ -2166,6 +2178,101 @@ function bindLeads(v){
 }
 
 
+/* ===== ЗАДАЧИ ===== */
+const TASK_ST=[{id:'sent',name:'Передано',color:'#64748b'},{id:'work',name:'В процессе',color:'#3b82f6'},{id:'review',name:'Ожидание feedback',color:'#f59e0b'},{id:'done',name:'Окончено',color:'#16a34a'}];
+function taskSt(id){return TASK_ST.find(x=>x.id===id)||TASK_ST[0]}
+function meId(){const m=myEmp();return m?m.id:(isTrainer()?'__trainer':'')}
+function liveTasks(){return Object.values(S.tasks||{}).filter(t=>!t.deleted)}
+function taskIsAssignee(t){const me=meId();return !!me&&t.assigneeId===me}
+function taskIsCreator(t){const me=meId();return !!me&&t.createdBy===me}
+function taskCanAct(t){return taskIsAssignee(t)||isTrainer()}
+function taskCanReview(t){return taskIsCreator(t)||isTrainer()}
+function taskCanEdit(t){return taskIsCreator(t)||isOwner()}
+function myOpenTasks(){const me=meId();if(!me)return 0;return liveTasks().filter(t=>(t.assigneeId===me&&(t.status==='sent'&&!t.declined||t.status==='work'))||(t.createdBy===me&&(t.status==='review'||t.declined))).length}
+function viewTasks(){
+  const me=meId();const f=S.tk.f;const all=liveTasks();const own=isOwner();
+  const vis=own?all:all.filter(t=>t.assigneeId===me||t.createdBy===me);
+  const list=vis.filter(t=>f==='all'?true:f==='mine'?t.assigneeId===me:t.createdBy===me)
+    .sort((a,b)=>String(b.statusAt||b.createdAt).localeCompare(String(a.statusAt||a.createdAt)));
+  const cnt=k=>vis.filter(t=>k==='mine'?t.assigneeId===me:k==='byme'?t.createdBy===me:true).filter(t=>t.status!=='done').length;
+  const opts=[{id:'mine',name:'Мне ('+cnt('mine')+')'},{id:'byme',name:'Я поставил ('+cnt('byme')+')'},{id:'all',name:(own?'Все задачи':'Все мои')+' ('+cnt('all')+')'}];
+  const tb=`<div class="toolbar"><button class="btn pri big" data-act="newTask" ${S.canWrite?'':'disabled'}>+ Новая задача</button><div class="grow"></div>${seg('tkf',opts,f)}</div>
+  <div class="note small" style="margin-bottom:12px">Передано → исполнитель нажимает «Принять» (или «Отказать» с причиной) → В процессе → «Готово, на проверку» → Ожидание feedback → постановщик: «Всё чётко» (Окончено) или «Вернуть» с описанием проблемы.</div>`;
+  const cols=TASK_ST.map(st=>{const items=list.filter(t=>(t.status||'sent')===st.id);
+    return `<div class="col"><div class="colh"><span class="dot" style="background:${st.color}"></span>${st.name}<span class="cnt">${items.length}</span></div>
+      ${items.map(t=>taskCard(t,st)).join('')||`<div class="muted small" style="padding:12px 6px">Пусто</div>`}</div>`}).join('');
+  return tb+`<div class="board" id="tboard">${cols}</div>`;
+}
+function taskCard(t,st){
+  const btn=(a,txt,cls)=>`<button class="btn sm ${cls||''}" data-tact="${a}" data-tid="${t.id}" ${S.canWrite?'':'disabled'}>${txt}</button>`;
+  const b=[];
+  if(t.status==='sent'&&!t.declined&&taskCanAct(t)){b.push(btn('accept','Принять','pri'));b.push(btn('decline','Отказать'))}
+  if(t.status==='sent'&&t.declined&&taskCanEdit(t)){b.push(btn('resend','Передать снова','pri'))}
+  if(t.status==='work'&&taskCanAct(t))b.push(btn('ready','Готово, на проверку','pri'));
+  if(t.status==='review'&&taskCanReview(t)){b.push(btn('ok','Всё чётко','pri'));b.push(btn('back','Вернуть'))}
+  const overdue=t.due&&t.status!=='done'&&t.due<today();
+  return `<div class="kcard" data-tkid="${t.id}" style="--sc:${st.color}">
+    <div class="nm"><span>${esc(t.title||'Без названия')}</span></div>
+    <div class="meta">Кому: <b>${esc(taskWho(t.assigneeId))}</b><br>От: ${esc(taskWho(t.createdBy))}${t.due?`<br><span style="${overdue?'color:var(--danger);font-weight:600':''}">Срок: ${dshow(t.due)}</span>`:''}
+      ${t.desc?`<div style="margin-top:4px;white-space:pre-wrap">${esc(t.desc.length>140?t.desc.slice(0,140)+'…':t.desc)}</div>`:''}
+      ${t.declined?`<div style="margin-top:6px;color:var(--danger);font-weight:600">Отказано: ${esc(t.declineReason||'—')}</div>`:''}
+      ${t.returnNote&&t.status!=='done'?`<div style="margin-top:6px;color:var(--warn);font-weight:600">Вернули: ${esc(t.returnNote)}</div>`:''}</div>
+    ${b.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${b.join('')}</div>`:''}</div>`;
+}
+function taskWho(id){if(!id)return '—';if(id==='__trainer')return 'Тренер';return empName(id)}
+function askText(title,label,ph){
+  return new Promise(res=>{
+    const m=openModal(`<div class="mh"><h2>${esc(title)}</h2></div><div class="mb"><div class="field"><label class="lbl">${esc(label)} <span style="color:var(--danger)">*</span></label><textarea class="input" id="at-t" rows="3" placeholder="${esc(ph||'')}"></textarea></div></div>
+    <div class="mf"><button class="btn pri" data-ok>Готово</button><button class="btn" data-no>Отмена</button></div>`,{cls:'narrow',onClose:()=>res(null)});
+    setTimeout(()=>{const t=m.querySelector('#at-t');t&&t.focus()},30);
+    m.querySelector('[data-ok]').onclick=()=>{const v=m.querySelector('#at-t').value.trim();if(!v){toast('Напишите текст');return}const s=modalStack[modalStack.length-1];s.onClose=null;closeModal();res(v)};
+    m.querySelector('[data-no]').onclick=()=>closeModal();
+  });
+}
+async function taskMove(id,act){
+  const t=S.tasks[id];if(!t)return;const by=meId();const h=(t.history||[]).slice(-30);let upd={};
+  if(act==='accept')upd={status:'work',declined:false,declineReason:''};
+  else if(act==='decline'){const r=await askText('Отказаться от задачи','Причина отказа','Почему не можете взять');if(!r)return;upd={declined:true,declineReason:r}}
+  else if(act==='resend')upd={declined:false,declineReason:'',status:'sent'};
+  else if(act==='ready')upd={status:'review'};
+  else if(act==='ok')upd={status:'done',doneAt:nowIso()};
+  else if(act==='back'){const r=await askText('Вернуть задачу','В чём проблема, что исправить','Опишите, что не так');if(!r)return;upd={status:'sent',returnNote:r,declined:false,declineReason:''}}
+  else return;
+  const names={accept:'принято',decline:'отказано',resend:'передано снова',ready:'на проверку',ok:'всё чётко',back:'возвращено'};
+  h.push({at:nowIso(),by,act:names[act],note:upd.declineReason||(act==='back'?upd.returnNote:'')||''});
+  try{await updDoc(BASE+'/tasks/'+id,{...upd,statusAt:nowIso(),history:h});toast('Задача: '+names[act])}catch(e){}
+}
+function openTask(id){
+  const me=meId();const t=id?{...S.tasks[id]}:{title:'',desc:'',assigneeId:me&&me!=='__trainer'?me:'',due:'',status:'sent'};
+  const edit=!id||taskCanEdit(t);const emps=liveEmps().filter(e=>e.active!==false);
+  const hist=(t.history||[]).slice().reverse();
+  const m=openModal(`<div class="mh"><h2>${id?'Задача':'Новая задача'}</h2><button class="iconbtn" data-x>✕</button></div><div class="mb">
+    <div class="field"><label class="lbl">Что сделать <span style="color:var(--danger)">*</span></label><input class="input" id="tk-title" value="${esc(t.title||'')}" ${edit?'':'disabled'} autocomplete="off"></div>
+    <div class="field"><label class="lbl">Подробности</label><textarea class="input" id="tk-desc" rows="4" ${edit?'':'disabled'}>${esc(t.desc||'')}</textarea></div>
+    <div class="grid2"><div class="field"><label class="lbl">Кому <span style="color:var(--danger)">*</span></label><select class="select" id="tk-who" ${edit?'':'disabled'}><option value="">— выберите —</option>${emps.map(e=>`<option value="${e.id}" ${t.assigneeId===e.id?'selected':''}>${esc(e.name)}${e.id===me?' (я)':''}</option>`).join('')}</select></div>
+    <div class="field"><label class="lbl">Срок</label><input type="date" class="input" id="tk-due" value="${esc(t.due||'')}" ${edit?'':'disabled'}></div></div>
+    ${id?`<div class="note small">Этап: <b>${taskSt(t.status).name}</b> · поставил(а): ${esc(taskWho(t.createdBy))}${t.declined?` · <span style="color:var(--danger)">отказано: ${esc(t.declineReason||'')}</span>`:''}</div>`:''}
+    ${hist.length?`<div class="field"><label class="lbl">История</label><div class="small">${hist.map(x=>`<div style="padding:3px 0;border-bottom:1px solid var(--line)">${dshow(x.at)} ${String(x.at).slice(11,16)} · <b>${esc(taskWho(x.by))}</b>: ${esc(x.act)}${x.note?' — '+esc(x.note):''}</div>`).join('')}</div></div>`:''}
+  </div><div class="mf">${edit?`<button class="btn pri big" data-save ${S.canWrite?'':'disabled'}>${id?'Сохранить':'Передать'}</button>`:''}<button class="btn" data-x>Закрыть</button><div class="grow"></div>${id&&edit?`<button class="btn danger" data-del>Удалить</button>`:''}</div>`);
+  $$('[data-x]',m).forEach(b=>b.onclick=()=>closeModal());
+  if(edit)$('[data-save]',m).onclick=async()=>{
+    const title=$('#tk-title',m).value.trim(),who=$('#tk-who',m).value;
+    if(!title){toast('Напишите задачу');return}if(!who){toast('Выберите, кому');return}
+    const old=id?S.tasks[id]:null;const tid=id||newId('tasks');
+    const data={...(old||{}),title,desc:$('#tk-desc',m).value.trim(),assigneeId:who,due:$('#tk-due',m).value,deleted:false,updatedAt:nowIso(),
+      createdAt:old?old.createdAt:nowIso(),createdBy:old?old.createdBy:me,status:old?old.status:'sent',statusAt:old?old.statusAt:nowIso(),
+      history:old?(old.history||[]):[{at:nowIso(),by:me,act:'передано → '+taskWho(who),note:''}]};
+    if(old&&old.assigneeId!==who){data.status='sent';data.declined=false;data.declineReason='';data.statusAt=nowIso();data.history=[...(old.history||[]).slice(-30),{at:nowIso(),by:me,act:'передано → '+taskWho(who),note:''}]}
+    closeModal();try{await setDoc(BASE+'/tasks/'+tid,data);toast(id?'Сохранено':'Задача передана')}catch(e){}
+  };
+  if(id&&edit)$('[data-del]',m).onclick=async()=>{if(await ask('Удалить задачу?',esc(t.title))){closeModal();try{await updDoc(BASE+'/tasks/'+id,{deleted:true});toast('Задача удалена',()=>updDoc(BASE+'/tasks/'+id,{deleted:false}))}catch(e){}}};
+}
+function bindTasks(v){
+  const g=$('[data-seg="tkf"]',v);if(g)g.onclick=e=>{const b=e.target.closest('button');if(!b)return;S.tk.f=b.dataset.v;render()};
+  $$('[data-tact]',v).forEach(b=>b.onclick=e=>{e.stopPropagation();taskMove(b.dataset.tid,b.dataset.tact)});
+  $$('[data-tkid]',v).forEach(el=>el.onclick=()=>openTask(el.dataset.tkid));
+}
+
 /* ===== СЕГОДНЯ: баннеры ===== */
 function todayBar(title,big,sub,cells){return `<div class="todaybar"><div class="tb-main"><div class="tb-lbl">${title}</div><div class="tb-big">${big}</div><div class="tb-sub">${sub}</div></div>
   <div class="tb-cells">${cells.map(([k,v,h])=>`<div class="tb-cell ${h?'hl':''}"><div class="tb-k">${k}</div><div class="tb-v">${v}</div></div>`).join('')}</div></div>`}
@@ -2203,10 +2310,11 @@ function bindUpcoming(v){$$('[data-upcity]',v).forEach(b=>b.onclick=()=>{S.up.ci
 
 /* ===== ЖУРНАЛ ИЗМЕНЕНИЙ ===== */
 const LOG_MAX=500;
-const LOG_AREA={clients:'Клиенты',leads:'Лиды',employees:'Игроки',expenses:'Расходы',payments:'Выплаты',schedule:'Расписание',config:'Настройки',periods:'Периоды',viewers:'Доступ'};
-const LOG_FIELDS={...FIELD_LABELS,retake:'пересдача',closed:'итог сделки',rates:'ставки',decideReason:'что случилось',decideNote:'комментарий «нужно решить»',archived:'архив',deleted:'удаление',offers:'предложенные даты',source:'источник',sellerId:'продажник',nextAt:'когда связаться',lostReason:'причина отказа',lostComment:'комментарий к отказу',clientId:'бронь',phone:'телефон',amount:'сумма',date:'дата',category:'категория',start:'время',dur:'длительность',playerId:'игрок',roles:'роли',rolesByCity:'роли по городам',photo:'фото',active:'статус',email:'логин',noPay:'не получает проценты',noSales:'без % за продажу',priority:'приоритет в связках',statuses:'этапы',accrual:'дата в аналитике',byEmp:'выплаты',refundPct:'% возврата',refundComment:'комментарий к возврату'};
+const LOG_AREA={clients:'Клиенты',leads:'Лиды',tasks:'Задачи',employees:'Игроки',expenses:'Расходы',payments:'Выплаты',schedule:'Расписание',config:'Настройки',periods:'Периоды',viewers:'Доступ'};
+const LOG_FIELDS={...FIELD_LABELS,title:'название',desc:'описание',assigneeId:'кому',due:'срок',declineReason:'причина отказа',returnNote:'что исправить',history:'история',declined:'отказ',retake:'пересдача',closed:'итог сделки',rates:'ставки',decideReason:'что случилось',decideNote:'комментарий «нужно решить»',archived:'архив',deleted:'удаление',offers:'предложенные даты',source:'источник',sellerId:'продажник',nextAt:'когда связаться',lostReason:'причина отказа',lostComment:'комментарий к отказу',clientId:'бронь',phone:'телефон',amount:'сумма',date:'дата',category:'категория',start:'время',dur:'длительность',playerId:'игрок',roles:'роли',rolesByCity:'роли по городам',photo:'фото',active:'статус',email:'логин',noPay:'не получает проценты',noSales:'без % за продажу',priority:'приоритет в связках',statuses:'этапы',accrual:'дата в аналитике',byEmp:'выплаты',refundPct:'% возврата',refundComment:'комментарий к возврату'};
 const LOG_SKIP=new Set(['refundMode','payParts','sessionId','slotId','_leadId','leadId','dateMode','imported','updatedAt','updatedBy','history','createdAt','createdBy','statusAt','expiresAt','offerExpiresAt','sess','_orig','priorityV','statusesV']);
 function logName(col,id,doc){if(col==='clients'||col==='leads'||col==='employees')return (doc&&doc.name)||'';
+  if(col==='tasks')return (doc&&doc.title||'')+(doc&&doc.assigneeId?' → '+empName(doc.assigneeId):'');
   if(col==='schedule'){const x=doc||{};const c=x.clientId&&S.clients[x.clientId];return [x.date?dshow(x.date):'',x.start||'',x.type==='slot'?'слот '+(x.playerId?empName(x.playerId):''):'',c?c.name:''].filter(Boolean).join(' · ')}
   if(col==='expenses')return (doc&&(doc.title||doc.category||''))+(doc&&doc.amount?' · '+money(doc.amount):'');
   if(col==='payments')return periodLabel?(()=>{try{return periodLabel(id)}catch(e){return id}})():id;
@@ -2217,7 +2325,7 @@ function logAction(col,old,data,isSet){
   if(data.deleted===false&&old.deleted)return 'восстановлено';
   if('archived' in data&&!!data.archived!==!!old.archived)return data.archived?'в архив':'из архива';
   const parts=[];
-  if('status' in data&&data.status!==old.status){const nm=x=>col==='clients'?statusById(x).name:col==='leads'?leadSt(x).name:x;parts.push('этап: '+nm(old.status)+' → '+nm(data.status))}
+  if('status' in data&&data.status!==old.status){const nm=x=>col==='clients'?statusById(x).name:col==='leads'?leadSt(x).name:col==='tasks'?taskSt(x).name:x;parts.push('этап: '+nm(old.status)+' → '+nm(data.status))}
   const keys=Object.keys(data).filter(k=>!LOG_SKIP.has(k)&&k!=='status'&&JSON.stringify(old[k]??'')!==JSON.stringify(data[k]??''));
   if(isSet)Object.keys(old).forEach(k=>{if(!(k in data)&&!LOG_SKIP.has(k)&&old[k]!==undefined&&old[k]!==''&&old[k]!==null&&!keys.includes(k))keys.push(k)});
   if(keys.length)parts.push('изменено: '+keys.slice(0,6).map(k=>LOG_FIELDS[k]||k).join(', ')+(keys.length>6?' и ещё '+(keys.length-6):''));
@@ -2225,7 +2333,7 @@ function logAction(col,old,data,isSet){
 function logWrite(path,data,isSet){
   try{if(!S.db||!path.startsWith(BASE+'/')||path.startsWith(BASE+'/log/'))return;
     const rest=path.slice(BASE.length+1).split('/');const col=rest[0],id=rest[1];if(!LOG_AREA[col])return;
-    const map={clients:'clients',leads:'leads',employees:'emps',expenses:'expenses',payments:'payments',schedule:'sched',periods:'periods',viewers:'viewers'};
+    const map={clients:'clients',leads:'leads',tasks:'tasks',employees:'emps',expenses:'expenses',payments:'payments',schedule:'sched',periods:'periods',viewers:'viewers'};
     const old=col==='config'?S.config:(S[map[col]]||{})[id];
     const action=logAction(col,old?JSON.parse(JSON.stringify(old)):null,data,isSet);if(!action)return;
     const name=logName(col,id,{...(old||{}),...data});
@@ -2342,7 +2450,7 @@ function viewMe(){
   const due=hist.reduce((a,r)=>a+r.due,0),paidAll=hist.reduce((a,r)=>a+r.paid,0),earnedAll=hist.reduce((a,r)=>a+r.total,0);
   const month=hist.filter(r=>r.k.startsWith(ym)).reduce((a,r)=>a+r.total,0);
   const period=(hist.find(r=>r.k===cur)||{total:0}).total;
-  const mine=c=>c.teacherId===me.id||c.techId===me.id||c.soldBy===me.id||((c.rates&&c.rates.extras)||[]).some(x=>x.empId===me.id);
+  const mine=c=>c.teacherId===me.id||c.techId===me.id||c.ieltsOrgId===me.id||c.soldBy===me.id||((c.rates&&c.rates.extras)||[]).some(x=>x.empId===me.id);
   const allMine=liveClients().filter(mine);
   const myClients=allMine.filter(c=>!c.archived).sort((a,b)=>(a.examDate||'9').localeCompare(b.examDate||'9'));
   const sid=c=>statusById(c.status).id;
@@ -2358,7 +2466,7 @@ function viewMe(){
   const lostOf=c=>Math.max(0,(calcClient({...c,refund:0}).byEmp[me.id]||0)-(calcClient(c).byEmp[me.id]||0));
   const potential=openMine.reduce((a,c)=>a+potOf(c),0);
   const lostCl=closed.filter(c=>lostOf(c)>0);const lost=lostCl.reduce((a,c)=>a+lostOf(c),0);
-  const roleOf=c=>[c.teacherId===me.id?'учитель':'',c.techId===me.id?'тех':'',c.soldBy===me.id?'продажа':'',((c.rates&&c.rates.extras)||[]).some(x=>x.empId===me.id)?'доплата':''].filter(Boolean).join(', ');
+  const roleOf=c=>[c.ieltsOrgId===me.id?'организатор IELTS':'',c.teacherId===me.id?'учитель':'',c.techId===me.id?'тех':'',c.soldBy===me.id?'продажа':'',((c.rates&&c.rates.extras)||[]).some(x=>x.empId===me.id)?'доплата':''].filter(Boolean).join(', ');
   const KI={'К выплате':'wallet','Ждёт выплаты':'wallet','Потенциальный заработок':'trend','Потеряно на возвратах':'undo','К выплате сейчас':'wallet','Текущий период':'clock','За этот месяц':'cal','Заработано за всё время':'coins','Мои клиенты':'users','Довольные клиенты':'smile','Записей на 2 недели':'cal','Свободно на неделе':'clock'};
   const k=(l,v,sub,h)=>kpi(KI[l]||(l.startsWith('Выплата')?'cal':''),l,v,{sub,hero:h});
   const hr=new Date().getHours();const hi=hr<12?'Доброе утро':hr<18?'Добрый день':'Добрый вечер';
@@ -2438,6 +2546,7 @@ function buildItems(from,to,pf){
         type:x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam==='Другое'&&c.examOther?c.examOther:c.exam||''),title:c.name,who:pairName(x),city:x.city,conf:false,comment:c.address?'Адрес: '+c.address:'',techId:x.techId,arrive:x.start?fromMin(toMin(x.start)-ARRIVE_MIN):''});return}
     if(x.type==='slot'){const cid=slotOwner(x);const c=cid?S.clients[cid]:null;
       if(!c&&pf.free===false)return;
+      if(!c){const ws=toMin(x.start),we=ws+num(x.dur||60);freeIntervals(x.playerId,x.date,ws,we).forEach(([a,b])=>items.push({kind:'slot',id:x.id,date:x.date,start:fromMin(a),end:fromMin(b),free:true,color:SLOT_FREE,type:'Свободен · '+freeRoleLabel(x),title:'',who:empName(x.playerId),city:'all',conf:false}));return}
       items.push({kind:'slot',id:x.id,date:x.date,start:x.start,end,free:!c,arrive:c&&x.start?fromMin(toMin(x.start)-ARRIVE_MIN):'',color:c?(x.bookKind==='retake'?RETAKE_COLOR:EXAM_COLOR):SLOT_FREE,
         type:c?(x.bookKind==='retake'?'Пересдача':'Экзамен '+(c.exam||'')):'Свободен · '+freeRoleLabel(x),title:c?c.name:'',who:empName(x.playerId),city:c?x.city:'all',conf:false});return}
     items.push({kind:'ev',id:x.id,date:x.date,start:x.start||'',end,color:evType(x.type).color,type:evType(x.type).name,
@@ -2460,10 +2569,10 @@ function schItems(from,to){
   const me=myEmp();const f=S.sch;const mine=schMine()&&me;
   return buildItems(from,to,{free:f.slots!==false,
     ev:x=>(!f.city||(x.type==='slot'&&!slotOwner(x)?(hasRole(emp(x.playerId),f.city,'teacher')||hasRole(emp(x.playerId),f.city,'tech')):x.city===f.city))&&(!f.player||partIds(x).includes(f.player))&&(!mine||partIds(x).includes(me.id)),
-    cl:c=>(!f.city||c.city===f.city)&&(!f.player||c.teacherId===f.player||c.techId===f.player)&&(!mine||c.teacherId===me.id||c.techId===me.id)});
+    cl:c=>(!f.city||c.city===f.city)&&(!f.player||c.teacherId===f.player||c.techId===f.player||c.ieltsOrgId===f.player)&&(!mine||c.teacherId===me.id||c.techId===me.id||c.ieltsOrgId===me.id)});
 }
 function schItemsFor(empId,from,to){
-  return buildItems(from,to,{free:false,ev:x=>partIds(x).includes(empId),cl:c=>c.teacherId===empId||c.techId===empId}).map(it=>({...it,who:it.kind==='session'?it.who:''}));
+  return buildItems(from,to,{free:false,ev:x=>partIds(x).includes(empId),cl:c=>c.teacherId===empId||c.techId===empId||c.ieltsOrgId===empId}).map(it=>({...it,who:it.kind==='session'?it.who:''}));
 }
 /* добавление свободного времени пачкой */
 function openSlots(date,pid){
@@ -2810,9 +2919,9 @@ function exportClients(fmt){
 }
 function exportPayouts(fmt){
   const key=S.pay.period;const L=ledger();
-  const rows=liveEmps().map(e=>payRow(key,e.id,L)).filter(r=>r.total||r.paid).map(r=>{const p=paymentsOf(key,r.empId);return [empName(r.empId),r.base.byRole.teacher,r.base.byRole.tech,r.base.byRole.sales,r.base.byRole.extra,r.corrSum,r.total,r.paid,r.due,p.length?dshow(p[p.length-1].date):'']});
-  const tot=['Итого',...[1,2,3,4,5,6,7,8].map(i=>rows.reduce((a,r)=>a+r[i],0)),''];
-  exportTable('Выплаты_'+periodLabel(key).replace(/\s/g,'_'),['Игрок','Как учитель','Как тех','За продажи','Доплаты','Корректировки','Итого','Выплачено','К выплате','Дата выплаты'],[...rows,tot],fmt);
+  const rows=liveEmps().map(e=>payRow(key,e.id,L)).filter(r=>r.total||r.paid).map(r=>{const p=paymentsOf(key,r.empId);return [empName(r.empId),r.base.byRole.teacher,r.base.byRole.tech,r.base.byRole.sales,r.base.byRole.ielts||0,r.base.byRole.extra,r.corrSum,r.total,r.paid,r.due,p.length?dshow(p[p.length-1].date):'']});
+  const tot=['Итого',...[1,2,3,4,5,6,7,8,9].map(i=>rows.reduce((a,r)=>a+r[i],0)),''];
+  exportTable('Выплаты_'+periodLabel(key).replace(/\s/g,'_'),['Игрок','Как учитель','Как тех','За продажи','Организатор IELTS','Доплаты','Корректировки','Итого','Выплачено','К выплате','Дата выплаты'],[...rows,tot],fmt);
 }
 
 /* ===== обработчики ===== */
@@ -2835,6 +2944,7 @@ function bindView(r){
     if(d.act==='payExport')return exportPayouts(d.fmt);
     if(d.act==='newExp')return openExp(null);
     if(d.act==='newLead')return openLead(null);
+    if(d.act==='newTask')return openTask(null);
     if(d.act==='importLeads')return importLeads();
     if(d.act==='clearLd'){S.ld={q:'',city:'',seller:''};return render()}
     if(d.act==='goSched'){S.sch.mine=true;location.hash='schedule';return}
@@ -2898,7 +3008,7 @@ async function init(){
   SB.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT')location.reload()});
   const st=makeStore(SB);S.db=st.db;S.uid=session.user.id;S.email=(session.user.email||'').toLowerCase();S.ownerAcc=false;
   const col=(name,key)=>S.db.collection(BASE+'/'+name).onSnapshot(snap=>{const o={};snap.docs.forEach(d=>o[d.id]={id:d.id,...d.data()});S[key]=o;S.got[key]=true;S.fresh[key]=true;schedule();afterData()});
-  col('employees','emps');col('clients','clients');col('expenses','expenses');col('periods','periods');col('payments','payments');col('viewers','viewers');col('schedule','sched');col('leads','leads');col('log','log');
+  col('employees','emps');col('clients','clients');col('expenses','expenses');col('periods','periods');col('payments','payments');col('viewers','viewers');col('schedule','sched');col('leads','leads');col('tasks','tasks');col('log','log');
   S.db.doc(BASE+'/config/app').onSnapshot(d=>{S.config=d.exists?d.data():null;S.got.config=true;S.fresh.config=true;schedule();afterData()});
   try{await st.loadAll()}catch(e){
     if(e&&e.code==='invalid_argument'){await SB.auth.signOut();return}
