@@ -450,7 +450,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 20.11 · 02:36</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 20.11 · 02:38</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -939,6 +939,7 @@ function viewBoard(city){
 }
 function kflags(c,r){const st=statusById(c.status).id;const f=[];const F_=(col,t,rm)=>f.push(`<span class="kflag" style="--fc:${col}">${t}${rm&&S.canWrite?`<button type="button" class="kfx" data-kflag="${c.id}|${rm}" title="Убрать метку" aria-label="Убрать метку">×</button>`:''}</span>`);
   if(st==='decide'&&c.decideReason)F_('#E8743B','Под вопросом: '+esc(c.decideReason),'decide');
+  if(st==='bron'&&c.infoLater)F_('#94a3b8','Инфо укажем позже');
   const o=closedOutcome(c);
   if(o==='good')F_('var(--ok)','Доволен'+(c.closed&&c.closed.score?' · '+esc(c.closed.score):''));
   if(o==='bad')F_('var(--danger)','Недоволен'+(c.closed&&c.closed.refundType?' · '+(c.closed.refundType==='full'?'полный':'частичный')+' возврат':''));
@@ -1186,7 +1187,7 @@ async function syncSession(oldId,sess,cid,kind){
   await setDoc(BASE+'/schedule/'+nid,{type:'session',date:sess.date,start:sess.start,dur:num(sess.dur)||cfg().sessionMin,city:sess.city||c.city||'',techId:sess.techId,teacherId:sess.teacherId,clientId:cid,bookKind:kind,deleted:false,createdAt:nowIso(),createdBy:S.uid||''});
   return nid;
 }
-const STATUS_HINT={offered:'Предложите клиенту до 3 вариантов времени — они держатся за ним '+HOLD_HOURS+' часов.',bron:'Клиент оплатил бронь. Дату пока не выбираем — заполните уровень, целевой балл и дедлайн.',process:'Дата подтверждена клиентом — выберите или утвердите время связки.',retake:'Отправляем на пересдачу — выберите вид и дату ниже.',closed:'Сделка закрыта — заполните фидбэк ниже.'};
+const STATUS_HINT={offered:'Предложите клиенту до 3 вариантов времени — они держатся за ним '+HOLD_HOURS+' часов.',bron:'Клиент оплатил бронь. Дату пока не выбираем — заполните уровень, целевой балл и дедлайн или отметьте «Укажем позже» (к «Дата предложена» они обязательны).',process:'Дата подтверждена клиентом — выберите или утвердите время связки.',retake:'Отправляем на пересдачу — выберите вид и дату ниже.',closed:'Сделка закрыта — заполните фидбэк ниже.'};
 function setFormStatus(v){
   F.status=v;
   if(v==='offered'&&!F.offers)F.offers=[];
@@ -1239,10 +1240,11 @@ function drawClientForm(){
     ${c.status!=='bron'&&c.exam!=='IELTS'&&(!teacherList(c.city).length||!techList(c.city).length)?`<div class="info">В городе ${esc(CITY_NAME[c.city])} ${!teacherList(c.city).length?'нет активных учителей':''}${!teacherList(c.city).length&&!techList(c.city).length?' и ':''}${!techList(c.city).length?'нет активных тех специалистов':''}. Добавьте их в разделе «Игроки».</div>`:''}
     <div class="field"><label class="lbl">Статус</label><div class="seg status" data-seg="status">${st.map(s=>`<button type="button" data-v="${s.id}" class="${c.status===s.id?'on':''}" style="--sc:${s.color}"><span class="dot" style="background:${s.color}"></span>${esc(s.name)}</button>`).join('')}</div>
       ${STATUS_HINT[c.status]?`<div class="small muted" style="margin-top:8px">${STATUS_HINT[c.status]}</div>`:''}</div>
-    <div class="grid3">
-      <div class="field"><label class="lbl">Уровень клиента</label><input class="input" id="c-level" value="${esc(c.level||'')}" placeholder="напр. B1 / 5.5 / 90"></div>
-      <div class="field"><label class="lbl">Нужный балл</label><input class="input" id="c-target" value="${esc(c.target||'')}" placeholder="напр. IELTS 6.5 / TOEFL 90"></div>
-      <div class="field"><label class="lbl">Дедлайн сдачи</label><input type="date" class="input" id="c-deadline" value="${esc(c.deadline||'')}"></div>
+    ${c.status==='bron'?`<label class="row small" style="gap:8px;margin:2px 0 8px;cursor:pointer"><input type="checkbox" id="c-infoLater" ${c.infoLater?'checked':''}> <b>Укажем позже</b> <span class="muted">— уровень, балл и дедлайн пока неизвестны</span></label>`:''}
+    <div class="grid3" ${c.status==='bron'&&c.infoLater?'style="opacity:.55"':''}>
+      <div class="field"><label class="lbl">Уровень клиента${c.status==='offered'||(c.status==='bron'&&!c.infoLater)?' <span style="color:var(--danger)">*</span>':''}</label><input class="input" id="c-level" value="${esc(c.level||'')}" placeholder="напр. B1 / 5.5 / 90"></div>
+      <div class="field"><label class="lbl">Нужный балл${c.status==='offered'||(c.status==='bron'&&!c.infoLater)?' <span style="color:var(--danger)">*</span>':''}</label><input class="input" id="c-target" value="${esc(c.target||'')}" placeholder="напр. IELTS 6.5 / TOEFL 90"></div>
+      <div class="field"><label class="lbl">Дедлайн сдачи${c.status==='offered'||(c.status==='bron'&&!c.infoLater)?' <span style="color:var(--danger)">*</span>':''}</label><input type="date" class="input" id="c-deadline" value="${esc(c.deadline||'')}"></div>
     </div>
     ${c.status==='offered'?offerBlock():''}
     ${c.status!=='bron'&&c.status!=='offered'?`<div class="field" id="dateblock"><label class="lbl">Дата экзамена ${c.status==='process'?'<span style="color:var(--danger)">*</span>':''}</label>${dateBlock('main')}</div>`
@@ -1388,6 +1390,7 @@ function bindClientForm(box){
   $$('[data-slot-clear]',box).forEach(b=>b.onclick=()=>{const key=b.dataset.slotClear;if(key==='main'){F.slotId='';F.sess=null;F.examDate='';F.examTime=''}else{F.retake.slotId='';F.retake.sess=null;F.retake.date='';F.retake.time=''}drawClientForm()});
   const txt={'c-name':'name','c-address':'address','c-level':'level','c-target':'target','c-deadline':'deadline','c-examOther':'examOther','c-payDate':'payDate','c-comment':'comment','c-decideNote':'decideNote','c-refundComment':'refundComment'};
   Object.entries(txt).forEach(([id,k])=>{const el=$('#'+id,box);if(el)el.oninput=()=>{F[k]=el.value}});
+  const il=$('#c-infoLater',box);if(il)il.onchange=()=>{F.infoLater=il.checked;drawClientForm()};
   const md=$('#main-date',box);if(md)md.onchange=()=>{F.examDate=md.value};const mt=$('#main-time',box);if(mt)mt.onchange=()=>{F.examTime=mt.value};
   const rd=$('#retake-date',box);if(rd)rd.onchange=()=>{F.retake.date=rd.value};const rtm=$('#retake-time',box);if(rtm)rtm.onchange=()=>{F.retake.time=rtm.value};
   const rc=$('#rt-comment',box);if(rc)rc.oninput=()=>{F.retake.comment=rc.value};
@@ -1437,7 +1440,7 @@ async function saveClient(){
   {const was=c.id&&S.clients[c.id]&&S.clients[c.id].exam==='IELTS';if(c.exam==='IELTS'&&c.city!=='shymkent'){toast('IELTS можно только для клиентов Шымкента');return}if(c.exam==='IELTS'&&!was&&!canAddIelts()){toast('Нет доступа к IELTS');return}}
   if(!c.soldBy){toast('Укажите, кто продал');const el=$('#c-soldBy');if(el){el.focus();el.scrollIntoView({block:'center'})}return}
   const need=(cond,msg,id)=>{if(cond){toast(msg);const el=id&&$('#'+id);if(el){el.focus();el.scrollIntoView({block:'center'})}return true}return false};
-  if(c.status==='bron'&&(need(!String(c.level||'').trim(),'Укажите уровень клиента','c-level')||need(!String(c.target||'').trim(),'Укажите, сколько баллов нужно','c-target')||need(!c.deadline,'Укажите дедлайн сдачи','c-deadline')))return;
+  if((c.status==='offered'||(c.status==='bron'&&!c.infoLater))&&(need(!String(c.level||'').trim(),'Укажите уровень клиента','c-level')||need(!String(c.target||'').trim(),'Укажите, сколько баллов нужно','c-target')||need(!c.deadline,'Укажите дедлайн сдачи','c-deadline')))return;
   if(c.status==='offered'&&!(c.offers||[]).length){toast('Выберите хотя бы один вариант времени для клиента');const el=$('#offerblock');if(el)el.scrollIntoView({block:'center'});return}
   if(c.status==='offered'){
     for(const o of c.offers){const keep=((S.clients[c.id]||{}).offers||[]).some(x=>sameOpt(x,o)&&x.sessionId&&S.sched[x.sessionId]&&sessLive(S.sched[x.sessionId]));
@@ -1469,7 +1472,7 @@ async function saveClient(){
     retake:rt,addon:rt?rt.kind:'none',
     refund:Math.round(num(c.refund)),refundMode:c.refundMode||'sum',refundPct:c.refundMode==='pct'?num(c.refundPct):'',refundComment:c.closed&&c.closed.outcome==='bad'?String(c.closed.comment||'').trim():String(c.refundComment||'').trim(),
     expense:Math.round(num(c.expense)),comment:String(c.comment||'').trim(),decideReason:c.status==='decide'?(c.decideReason||''):(c.decideReason||''),decideNote:String(c.decideNote||'').trim(),
-    level:String(c.level||'').trim(),target:String(c.target||'').trim(),deadline:c.deadline||'',
+    level:String(c.level||'').trim(),target:String(c.target||'').trim(),deadline:c.deadline||'',infoLater:c.status==='bron'&&!!c.infoLater&&!(String(c.level||'').trim()&&String(c.target||'').trim()&&c.deadline),
     offers:[],offerExpires:'',
     closed:c.closed?{outcome:c.closed.outcome||'',score:c.closed.outcome==='good'?String(c.closed.score||'').trim():'',result:c.closed.outcome==='good'?String(c.closed.result||'').trim():'',attempts:c.closed.outcome==='good'?String(c.closed.attempts||'').trim():'',
       reasons:c.closed.outcome==='bad'?(c.closed.reasons||[]):[],refundType:c.closed.outcome==='bad'?c.closed.refundType:'',comment:String(c.closed.comment||'').trim(),date:c.closed.date||today()}:null,
@@ -1519,7 +1522,7 @@ async function syncSlot(oldId,newId_,cid,kind){
 }
 async function setClientStatus(id,status){
   const c=S.clients[id];if(!c||c.status===status)return;
-  if(status==='offered'||status==='retake'||status==='closed'||(status==='decide'&&!S.clients[id].decideReason)||(status==='process'&&!c.examDate)||(status==='bron'&&!(c.level&&c.target&&c.deadline))){openClient(id,false,status);return}
+  if(status==='offered'||status==='retake'||status==='closed'||(status==='decide'&&!S.clients[id].decideReason)||(status==='process'&&!c.examDate)||(status==='bron'&&!(c.level&&c.target&&c.deadline)&&!c.infoLater)){openClient(id,false,status);return}
   const hist=[...(c.history||[]),{at:nowIso(),by:S.uid||'',action:'статус → '+statusById(status).name}].slice(-60);
   const wasClosed=isClosed(c)&&status!=='closed';
   if(status==='bron')setTimeout(()=>cheerBron(c.name),150);else if(status==='decide')setTimeout(()=>calmDecide(c.name),150);
