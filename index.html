@@ -416,7 +416,7 @@ div.mb-ava{background:#fff!important;color:#1C3354!important}
   <aside class="side" id="side">
     <div class="logo"><i class="lg"><img src="assets/logo-v.png" alt="V"></i><div style="letter-spacing:.14em;font-weight:600">VANGUARD<small style="letter-spacing:0">CRM · подготовка к экзаменам</small></div></div>
     <nav class="nav" id="nav"></nav>
-    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 20.11 · 01:40</div>
+    <div class="tiny muted ver" style="margin-top:auto;padding:16px 10px 0">Версия 20.11 · 01:45</div>
   </aside>
   <div class="main">
     <header class="top">
@@ -1292,13 +1292,13 @@ function drawCalc(){
    ${r.refund?`<div class="cl"><span>Возврат</span><span>− ${money(r.refund)}</span></div>`:''}
    <div class="cl"><span><b>Общая выручка</b></span><span>${money(r.revenue)}</span></div>
    ${r.curator?`<div class="cl"><span>Куратор (Асель)</span><span>− ${money(r.curator)}</span></div>`:''}
-   ${F.exam==='IELTS'?`<div class="cl"><span>Комиссия Vanguard <span class="muted">(сразу в чистые Vanguard)</span></span><span>${money(r.vcom)}</span></div><div class="cl"><span><b>Остаток для организатора</b></span><span>${money(r.base)}</span></div>`:''}
+   ${F.exam==='IELTS'?`<div class="cl"><span>Комиссия Vanguard <span class="muted">(входит в «Итого Vanguard»)</span></span><span>${money(r.vcom)}</span></div><div class="cl"><span><b>Остаток для организатора</b></span><span>${money(r.base)}</span></div>`:''}
    ${lines}
    ${r.split?(()=>{const v=rtAmounts(F.retake,r.fee).v;return `<div class="cl"><span>Пересдача — Vanguard <span class="muted">${r.fee?Math.round(v/r.fee*1000)/10:0}% от ${money(r.fee)}</span></span><span>${money(v)}</span></div>`})():''}
    ${multi.map(([id,v])=>`<div class="cl small muted"><span>${esc(empName(id))} всего (несколько ролей)</span><span>${money(v)}</span></div>`).join('')}
    ${r.rexp?`<div class="cl muted"><span>Расходная пересдача ${money(r.rexp)} — внесите во вкладку «Расходы»</span><span></span></div>`:''}
    ${r.paid+r.fee>0&&r.revenue===0?'<div class="small muted">Полный возврат: доли игроков обнулены.</div>':''}
-   <div class="cl tot"><span>Итого Vanguard</span><span>${money(r.vanguard)}</span></div>`;
+   <div class="cl tot"><span>Итого Vanguard</span><span>${money(r.vanguard)}</span></div>${r.vcom?`<div class="cl small muted"><span>из них комиссия Vanguard ${money(r.vcom)} + остаток после организатора ${money(r.vanguard-r.vcom)}</span><span></span></div>`:''}`;
 }
 function applyRates(which){
   const c=F;const rules=cfg().rules;
